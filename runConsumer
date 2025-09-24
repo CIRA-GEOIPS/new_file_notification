@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -x
+
+# This depends on a filled in .env copied from dev.env
+source .env
+python get_file_notif.py "$@"
