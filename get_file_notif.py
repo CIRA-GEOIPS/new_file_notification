@@ -61,6 +61,9 @@ def main():
         level="DEBUG" if pargs.verbose else "INFO",
     )
 
+    # Reduce pika logging
+    logging.getLogger('pika').setLevel(logging.WARNING)
+
     consume_notification()
 
 

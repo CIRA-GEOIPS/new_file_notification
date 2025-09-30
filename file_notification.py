@@ -129,6 +129,9 @@ def main():
         level="DEBUG" if pargs.verbose else "INFO",
     )
 
+    # Reduce pika logging
+    logging.getLogger('pika').setLevel(logging.WARNING)
+
     log.info("Sending new file notification to GeoIPS")
 
     produce_notification(
