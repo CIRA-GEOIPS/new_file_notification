@@ -1,8 +1,0 @@
-#!/bin/bash
-
-set -x
-
-# This depends on a filled in .env copied from dev.env
-source .env
-echo $HOST
-python file_notification.py "$@"

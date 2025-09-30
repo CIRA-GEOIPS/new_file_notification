@@ -8,6 +8,7 @@ import logging
 import argparse
 import pika
 import json
+import configparser
 
 DESCRIPTION = """
 Allows a data ingest process to send a new file notification to the GeoIPS
@@ -20,6 +21,7 @@ log = logging.getLogger(__name__)
 
 
 def produce_notification(
+    config,
     filepath,
     product,
     version,
@@ -32,10 +34,11 @@ def produce_notification(
     """
     Send a "Fair Dispatch" message via RabbitMQ
     """
+    log.info(f'RMQ_HOST:  {config["Settings"]["RMQ_HOST"]}')
 
     # Establish connection and create a channel on that connection
     connection = pika.BlockingConnection(
-        pika.ConnectionParameters(host=os.environ.get("HOST"))
+        pika.ConnectionParameters(host=config["Settings"]["RMQ_HOST"])
     )
     channel = connection.channel()
 
@@ -132,9 +135,18 @@ def main():
     # Reduce pika logging
     logging.getLogger('pika').setLevel(logging.WARNING)
 
+    # Read the configuration file
+    config = configparser.ConfigParser()
+    try:
+        config.read('config.ini')
+    except FileNotFoundError:
+        log.error("config.ini not found. Please ensure the file exists.")
+        exit()
+
     log.info("Sending new file notification to GeoIPS")
 
     produce_notification(
+        config,
         pargs.filepath,
         pargs.product,
         pargs.version,

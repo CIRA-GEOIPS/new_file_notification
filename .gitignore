@@ -45,8 +45,9 @@ cover/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Environments
+# Environments/configuration
 .env
+config.ini
 
 # Data and Reference Files
 *.npy

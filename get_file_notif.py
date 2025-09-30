@@ -4,6 +4,7 @@ import logging
 import argparse
 import pika
 import json
+import configparser
 
 DESCRIPTION = """
 Receives a new file notification from the GeoIPS RabbitMQ "New File
@@ -14,10 +15,10 @@ DB.
 log = logging.getLogger(__name__)
 
 
-def consume_notification():
+def consume_notification(config):
     # Establish connection and create a channel on that connection
     connection = pika.BlockingConnection(
-        pika.ConnectionParameters(host=os.environ.get("HOST"))
+        pika.ConnectionParameters(host=config["Settings"]["RMQ_HOST"])
     )
     channel = connection.channel()
 
@@ -64,7 +65,15 @@ def main():
     # Reduce pika logging
     logging.getLogger('pika').setLevel(logging.WARNING)
 
-    consume_notification()
+        # Read the configuration file
+    config = configparser.ConfigParser()
+    try:
+        config.read('config.ini')
+    except FileNotFoundError:
+        log.error("config.ini not found. Please ensure the file exists.")
+        exit()
+
+    consume_notification(config)
 
 
 if __name__ == "__main__":
