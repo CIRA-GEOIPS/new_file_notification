@@ -21,6 +21,8 @@ log = logging.getLogger(__name__)
 
 def produce_notification(
     filepath,
+    product,
+    version,
     start_time=None,
     end_time=None,
     length=None,
@@ -43,6 +45,8 @@ def produce_notification(
     # Put the message data in a dictionary for conversion to JSON
     msg_dict = {
         "filepath": filepath,
+        "product": product,
+        "version": version,
         "start_time": start_time,
         "end_time": end_time,
         "length": length,
@@ -74,6 +78,12 @@ def main():
     # Add the positional argument(s?)
     parser.add_argument(
         "filepath", type=str, help="Send a notification for the file with this path."
+    )
+    parser.add_argument(
+        "product", type=str, help="The file's product."
+    )
+    parser.add_argument(
+        "version", type=str, help="The file's version."
     )
 
     # Add the flags
@@ -119,8 +129,12 @@ def main():
         level="DEBUG" if pargs.verbose else "INFO",
     )
 
+    log.info("Sending new file notification to GeoIPS")
+
     produce_notification(
         pargs.filepath,
+        pargs.product,
+        pargs.version,
         pargs.start_time,
         pargs.end_time,
         pargs.length,
@@ -130,5 +144,4 @@ def main():
 
 
 if __name__ == "__main__":
-    log.info("Sending new file notification to GeoIPS")
     main()
