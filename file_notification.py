@@ -9,6 +9,7 @@ import argparse
 import pika
 import json
 import configparser
+import shlex
 
 DESCRIPTION = """
 Allows a data ingest process to send a new file notification to the GeoIPS
@@ -18,6 +19,87 @@ DB.
 """
 
 log = logging.getLogger(__name__)
+
+import shlex
+
+def parse_mtab_alike(fobj):
+    """
+    Parses /etc/mtab (or /proc/self/mounts) and yields a dictionary for each entry.
+    fobj: The handle for the alread opened file to parse
+    """
+    for line in fobj:
+        # Ignore blank lines and comments (though mtab does not typically have them)
+        if not line.strip() or line.strip().startswith('#'):
+            continue
+
+        # Use shlex to correctly split fields, respecting quotes
+        fields = shlex.split(line)
+
+        # Skip malformed lines
+        if len(fields) < 6:
+            continue
+
+        yield {
+            'device': fields[0],
+            'mount_point': fields[1],
+            'fs_type': fields[2],
+            'options': fields[3],
+            'dump_freq': fields[4],
+            'pass_num': fields[5]
+        }
+
+
+def parse_mtab():
+    """
+    Parses /etc/mtab (or /proc/self/mounts) and yields a dictionary for each entry.
+    """
+    try:
+        #with open("/etc/mtab", "r") as fobj:
+        #    generator_object = parse_mtab_alike(fobj)
+        fobj = open("/etc/mtab", "r")
+        generator_object = parse_mtab_alike(fobj)
+    except FileNotFoundError:
+        log.warning("/etc/mtab not found. Trying /proc/self/mounts.")
+        try:
+            #with open("/proc/self/mounts", "r") as fobj:
+            #    generator_object = parse_mtab_alike(fobj)
+            fobj = open("/proc/self/mounts", "r")
+            generator_object = parse_mtab_alike(fobj)
+        except FileNotFoundError:
+            log.error("Could not open /proc/self/mounts.")
+
+    for mount in generator_object:
+        yield mount
+
+
+def resolve_data_store(filepath):
+    """
+    Get the data store name and the absolute path from the data store.
+    filepath: The filepath argument given to the program
+    """
+    # Read the /etc/mtab file to get the data store and mount point
+    # Example usage
+    data_store = None
+    fpath = None
+    mp_match_len = 0
+    log.info("Currently mounted filesystems:")
+    for mount in parse_mtab():
+        log.debug(f"Device: {mount['device']:<20} Mount Point: {mount['mount_point']:<20} FS Type: {mount['fs_type']:<10} Options: {mount['options']}")
+        if mount['mount_point'] == '/':
+            # Skip this - every path will match it
+            continue
+        # Check all the mount points and use the one with the longest match
+        if filepath.startswith(mount['mount_point']) and len(mount['mount_point']) > mp_match_len:
+            mp_match_len = len(mount['mount_point'])
+            dev_dir = mount['device'].split(":")
+            data_store = dev_dir[0]
+            if len(dev_dir) == 2:
+                # There is a path associated with the device. Replace the mount point with this path.
+                fpath = dev_dir[1] + filepath[len(mount['mount_point']):]
+            else:
+                fpath = filepath
+
+    return data_store, fpath
 
 
 def produce_notification(
@@ -34,6 +116,11 @@ def produce_notification(
     """
     Send a "Fair Dispatch" message via RabbitMQ
     """
+
+    # Get the data store name and the absolute path from the data store
+    data_store, fpath = resolve_data_store(filepath)
+    log.info(f'data_store: {data_store}, fpath: {fpath}')
+
     log.info(f'RMQ_HOST:  {config["Settings"]["RMQ_HOST"]}')
 
     # Establish connection and create a channel on that connection
@@ -47,7 +134,8 @@ def produce_notification(
 
     # Put the message data in a dictionary for conversion to JSON
     msg_dict = {
-        "filepath": filepath,
+        "data_store": data_store,
+        "filepath": fpath,
         "product": product,
         "version": version,
         "start_time": start_time,
