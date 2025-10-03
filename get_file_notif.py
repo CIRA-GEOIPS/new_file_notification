@@ -63,12 +63,12 @@ def main():
     )
 
     # Reduce pika logging
-    logging.getLogger('pika').setLevel(logging.WARNING)
+    logging.getLogger("pika").setLevel(logging.WARNING)
 
-        # Read the configuration file
+    # Read the configuration file
     config = configparser.ConfigParser()
     try:
-        config.read('config.ini')
+        config.read("config.ini")
     except FileNotFoundError:
         log.error("config.ini not found. Please ensure the file exists.")
         exit()

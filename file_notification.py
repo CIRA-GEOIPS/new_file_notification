@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 
 import shlex
 
+
 def parse_mtab_alike(fobj):
     """
     Parses /etc/mtab (or /proc/self/mounts) and yields a dictionary for each entry.
@@ -29,7 +30,7 @@ def parse_mtab_alike(fobj):
     """
     for line in fobj:
         # Ignore blank lines and comments (though mtab does not typically have them)
-        if not line.strip() or line.strip().startswith('#'):
+        if not line.strip() or line.strip().startswith("#"):
             continue
 
         # Use shlex to correctly split fields, respecting quotes
@@ -40,12 +41,12 @@ def parse_mtab_alike(fobj):
             continue
 
         yield {
-            'device': fields[0],
-            'mount_point': fields[1],
-            'fs_type': fields[2],
-            'options': fields[3],
-            'dump_freq': fields[4],
-            'pass_num': fields[5]
+            "device": fields[0],
+            "mount_point": fields[1],
+            "fs_type": fields[2],
+            "options": fields[3],
+            "dump_freq": fields[4],
+            "pass_num": fields[5],
         }
 
 
@@ -54,14 +55,14 @@ def parse_mtab():
     Parses /etc/mtab (or /proc/self/mounts) and yields a dictionary for each entry.
     """
     try:
-        #with open("/etc/mtab", "r") as fobj:
+        # with open("/etc/mtab", "r") as fobj:
         #    generator_object = parse_mtab_alike(fobj)
         fobj = open("/etc/mtab", "r")
         generator_object = parse_mtab_alike(fobj)
     except FileNotFoundError:
         log.warning("/etc/mtab not found. Trying /proc/self/mounts.")
         try:
-            #with open("/proc/self/mounts", "r") as fobj:
+            # with open("/proc/self/mounts", "r") as fobj:
             #    generator_object = parse_mtab_alike(fobj)
             fobj = open("/proc/self/mounts", "r")
             generator_object = parse_mtab_alike(fobj)
@@ -84,18 +85,23 @@ def resolve_data_store(filepath):
     mp_match_len = 0
     log.info("Currently mounted filesystems:")
     for mount in parse_mtab():
-        log.debug(f"Device: {mount['device']:<20} Mount Point: {mount['mount_point']:<20} FS Type: {mount['fs_type']:<10} Options: {mount['options']}")
-        if mount['mount_point'] == '/':
+        log.debug(
+            f"Device: {mount['device']:<20} Mount Point: {mount['mount_point']:<20} FS Type: {mount['fs_type']:<10} Options: {mount['options']}"
+        )
+        if mount["mount_point"] == "/":
             # Skip this - every path will match it
             continue
         # Check all the mount points and use the one with the longest match
-        if filepath.startswith(mount['mount_point']) and len(mount['mount_point']) > mp_match_len:
-            mp_match_len = len(mount['mount_point'])
-            dev_dir = mount['device'].split(":")
+        if (
+            filepath.startswith(mount["mount_point"])
+            and len(mount["mount_point"]) > mp_match_len
+        ):
+            mp_match_len = len(mount["mount_point"])
+            dev_dir = mount["device"].split(":")
             data_store = dev_dir[0]
             if len(dev_dir) == 2:
                 # There is a path associated with the device. Replace the mount point with this path.
-                fpath = dev_dir[1] + filepath[len(mount['mount_point']):]
+                fpath = dev_dir[1] + filepath[len(mount["mount_point"]) :]
             else:
                 fpath = filepath
 
@@ -119,7 +125,7 @@ def produce_notification(
 
     # Get the data store name and the absolute path from the data store
     data_store, fpath = resolve_data_store(filepath)
-    log.info(f'data_store: {data_store}, fpath: {fpath}')
+    log.info(f"data_store: {data_store}, fpath: {fpath}")
 
     log.info(f'RMQ_HOST:  {config["Settings"]["RMQ_HOST"]}')
 
@@ -170,12 +176,8 @@ def main():
     parser.add_argument(
         "filepath", type=str, help="Send a notification for the file with this path."
     )
-    parser.add_argument(
-        "product", type=str, help="The file's product."
-    )
-    parser.add_argument(
-        "version", type=str, help="The file's version."
-    )
+    parser.add_argument("product", type=str, help="The file's product.")
+    parser.add_argument("version", type=str, help="The file's version.")
 
     # Add the flags
     parser.add_argument(
@@ -221,12 +223,12 @@ def main():
     )
 
     # Reduce pika logging
-    logging.getLogger('pika').setLevel(logging.WARNING)
+    logging.getLogger("pika").setLevel(logging.WARNING)
 
     # Read the configuration file
     config = configparser.ConfigParser()
     try:
-        config.read('config.ini')
+        config.read("config.ini")
     except FileNotFoundError:
         log.error("config.ini not found. Please ensure the file exists.")
         exit()
