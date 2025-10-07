@@ -1,0 +1,19 @@
+# https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
+# Choosing a build backend for your Python package
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta" 
+
+[project]
+name = "new_file_notification" # REQUIRED
+version = "0.1.0"  # REQUIRED, although can be dynamic
+description = "Send and receive new file notifications"
+readme = "README.md"
+
+requires-python = ">=3.8"
+
+dependencies = ["pika"]
+
+authors = [
+  {name = "Jim Fluke", email = "james.fluke@colostate.edu" }
+]
