@@ -15,6 +15,12 @@ RabbitMQ's "fair dispatch" configuration. A given notification will be received
 by one consumer.
 
 ## Running the producer
+This must be run in a Python environment that includes `pika` - for connecting
+to RabbitMQ -  and other needed packages. The `environ-3.8.yml` file in this
+repository can be used to create a workable conda environment. Setting one up
+using `pip` will certainly also work. Python 3.8 is the minimum version needed
+to run the script. Higher versions should work.
+
 Copy the template-config.ini file to config.ini and edit the config.ini as
 described inside that file.
 Run the code with:
