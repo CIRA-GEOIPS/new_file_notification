@@ -58,3 +58,4 @@ config.ini
 *.bak*
 *.sav*
 *.tmp*
+*.out*

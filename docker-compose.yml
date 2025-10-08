@@ -1,0 +1,26 @@
+# Run this with 'docker-compose run --rm calipso-ingest-podaac'
+# Or just 'docker-compose up'
+services:
+  get_file_notif:
+    build: 
+      context: .
+      args:
+        - INV_API_TOKEN=${ACCESS_TOKEN}
+
+    image: get_file_notif
+    container_name: get_file_notif
+
+    user: ${UID}:${GID}
+    extra_hosts:
+      # alioth probably or echo1 (k8s)
+      - database:${DB_IP}
+    volumes:
+      - ./:/app
+
+    working_dir: /app
+
+    env_file:
+      - .env
+
+    network_mode: ${DOCKER_NETWORK}
+    entrypoint: python /app/new_file_notification/get_file_notif.py

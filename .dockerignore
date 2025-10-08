@@ -1,0 +1,17 @@
+# Ignore Git-related files
+.git
+.gitignore
+
+# Ignore Python specific files and directories
+__pycache__
+*.pyc
+.venv
+
+# Ignore log files
+build/
+*.log
+*.out
+
+# Ignore sensitive files
+.env
+config.ini
