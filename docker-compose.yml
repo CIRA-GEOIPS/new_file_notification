@@ -16,6 +16,7 @@ services:
       - database:${DB_IP}
     volumes:
       - ./:/app
+      - /:/data_store
 
     working_dir: /app
 

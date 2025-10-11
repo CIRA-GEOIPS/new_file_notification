@@ -5,6 +5,10 @@ import argparse
 import pika
 import json
 import configparser
+from functools import partial
+
+# GeoIPS modules: the data inventory client
+from data_inv_api import DIClient
 
 DESCRIPTION = """
 Receives a new file notification from the GeoIPS RabbitMQ "New File
@@ -27,16 +31,39 @@ def consume_notification(config):
     log.info(" [*] Waiting for messages. To exit press CTRL+C")
 
     # Create the recieve callback function
-    def callback(ch, method, properties, body):
+    def callback(ch, method, properties, body, custom_object):
         file_info = json.loads(body.decode())
         log.info(f" [x] Received file_info: {file_info}")
-        log.debug(" [x] Done")
+        fname = os.path.basename(file_info['filepath'])
+        rows = dic.find_files(filenames = fname)
+        for row in rows:
+            log.info('Got a DB row')
+            log.info(f"Before: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
+
+        tstart = '2013-06-29 11:18:33'
+        tend = '2013-06-29 12:57:33'
+        upsert_fpath = os.path.join("/data_store", file_info['filepath'][1:])
+        result = dic.upsert_file(upsert_fpath, file_info['product'], file_info['version'], tstart, tend, size=0)
+        log.info(f"upsert result: {result}")
+
+        rows = dic.find_files(filenames = fname)
+        for row in rows:
+            log.info('Got a DB row')
+            log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
+
+        log.info(" [x] Done")
         ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    # Create the data inventory client object and allow it to be sent to the
+    # rabbitmq callback
+    dic = DIClient(user='geoips', data_mount_dir='/data_store')
+    bound_callback = partial(callback, custom_object=dic)
 
     # Set up "whichever's ready" dispatching
     # Register the callback function with rabbitmq
     channel.basic_qos(prefetch_count=1)
-    channel.basic_consume(queue="file_notif_queue", on_message_callback=callback)
+    channel.basic_consume(queue="file_notif_queue",
+      on_message_callback=bound_callback)
 
     # Start the message checking loop
     channel.start_consuming()
