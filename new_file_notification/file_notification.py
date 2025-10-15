@@ -176,8 +176,6 @@ def main():
     parser.add_argument(
         "filepath", type=str, help="Send a notification for the file with this path."
     )
-    parser.add_argument("product", type=str, help="The file's product.")
-    parser.add_argument("version", type=str, help="The file's version.")
 
     # Add the flags
     parser.add_argument(
@@ -185,6 +183,20 @@ def main():
         "--verbose",
         action="store_true",
         help="Verbose output - set log level to DEBUG",
+    )
+
+    parser.add_argument(
+        "-p",
+        "--product",
+        default=None,
+        help="The file's product",
+    )
+
+    parser.add_argument(
+        "-r",
+        "--version",
+        default=None,
+        help="The file's version",
     )
 
     parser.add_argument(

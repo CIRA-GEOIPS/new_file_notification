@@ -25,19 +25,29 @@ Copy the template-config.ini file to config.ini and edit the config.ini as
 described inside that file.
 Run the code with:
 ```
-python file_notification.py [-h] [-v] [-s START_TIME] [-e END_TIME] [-l LENGTH] [-c CHECKSUM] [-t CHECKSUM_TYPE] filepath product version
+python file_notification.py [-h] [-v] [-p PRODUCT] [-r VERSION] [-s START_TIME] [-e END_TIME] [-l LENGTH] [-c CHECKSUM] [-t CHECKSUM_TYPE] filepath
 ```
 Run this with the -h (--help) argument to see the available flagged arguments.
 
 ## Running a consumer
 Get the config.ini file created and filled in as described above.
 
-Run the code with:
-```
-python get_file_notif.py [&]
-```
-This will start up a persistent process that will consume the new file
-notifications.
+The consumer is meant to be run in a Docker container using docker-compose. The
+Docker image includes the needed Python environment.
 
-Run this with -h (--help) to print out its usage description and then exit.
-Run it with -v (--verbose) to run it at the DEBUG level.
+If the image needs to be built, run:
+```
+docker-compose build
+```
+Run the consumer with:
+```
+docker-compose up [-d]
+```
+The `-d` with run it detached from the terminal.
+
+This will start up a persistent process that will consume the new file
+notifications and use them to add the files metadata to the DB.
+
+If it is run in a detached state a `docker-compose down` will stop it. If not,
+terminate it with Ctrl-C, wait ~10 seconds for it to stop, and then run
+`docker-compose down`.
