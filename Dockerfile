@@ -1,4 +1,4 @@
-FROM python:3.8 AS intermediate
+FROM python:3.12 AS intermediate
 
 LABEL org.opencontainers.image.authors="Jim Fluke <james.fluke@colostate.edu>"
 
@@ -14,7 +14,7 @@ RUN pip show xxhash
 
 RUN find / -name data_inv_api
 
-FROM python:3.8
+FROM python:3.12
 
 RUN apt-get update && apt-get install -y sudo libnss-wrapper
 
@@ -23,13 +23,13 @@ RUN apt-get update -y && apt-get upgrade -y && apt-get install -y python3-pip \
   && rm -rf /var/lib/apt/lists/*
 
 ARG SITE_VS_DIST=site-packages
-ARG PIP_PKG_DIR=//usr/local/lib/python3.8/${SITE_VS_DIST}/data_inv_api
+ARG PIP_PKG_DIR=//usr/local/lib/python3.12/${SITE_VS_DIST}/data_inv_api
 
 COPY --from=intermediate ${PIP_PKG_DIR} ${PIP_PKG_DIR}
 
 # Health check port
 EXPOSE 5000
 
-RUN pip install --no-cache-dir xxhash psycopg2 pika
+RUN pip install --no-cache-dir geoips xxhash psycopg2 pika
 
 ENTRYPOINT [ "python", "/app/new_file_notification/get_file_notif.py" ]

@@ -20,9 +20,6 @@ DB.
 
 log = logging.getLogger(__name__)
 
-import shlex
-
-
 def parse_mtab_alike(fobj):
     """
     Parses /etc/mtab (or /proc/self/mounts) and yields a dictionary for each entry.

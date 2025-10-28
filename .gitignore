@@ -46,7 +46,7 @@ cover/
 .ipynb_checkpoints
 
 # Environments/configuration
-.env
+.env*
 config.ini
 
 # Data and Reference Files
