@@ -9,7 +9,6 @@ import argparse
 import pika
 import json
 import configparser
-import shlex
 
 DESCRIPTION = """
 Allows a data ingest process to send a new file notification to the GeoIPS
@@ -20,54 +19,68 @@ DB.
 
 log = logging.getLogger(__name__)
 
-def parse_mtab_alike(fobj):
-    """
-    Parses /etc/mtab (or /proc/self/mounts) and yields a dictionary for each entry.
-    fobj: The handle for the alread opened file to parse
-    """
+def parse_mountinfo_alike(fobj):
+    mount_entries = []
     for line in fobj:
-        # Ignore blank lines and comments (though mtab does not typically have them)
-        if not line.strip() or line.strip().startswith("#"):
-            continue
+        # Each line in /proc/mountinfo has a specific format
+        # The fields are space-separated, but some fields can contain spaces
+        # The separator between the optional fields and the rest is '- '
+        parts = line.strip().split(' - ')
 
-        # Use shlex to correctly split fields, respecting quotes
-        fields = shlex.split(line)
+        # Extract the first part (non-optional fields)
+        first_part_fields = parts[0].split(' ')
 
-        # Skip malformed lines
-        if len(fields) < 6:
-            continue
+        # Extract the last part (optional fields and remaining fields)
+        last_part_fields = parts[1].split(' ') if len(parts) > 1 else []
 
-        yield {
-            "device": fields[0],
-            "mount_point": fields[1],
-            "fs_type": fields[2],
-            "options": fields[3],
-            "dump_freq": fields[4],
-            "pass_num": fields[5],
+        # Example of extracting common fields
+        # Adjust indices based on the specific fields you need
+        mount_id = int(first_part_fields[0])
+        parent_id = int(first_part_fields[1])
+        major_minor = first_part_fields[2]
+        root = first_part_fields[3]
+        mount_point = first_part_fields[4]
+        mount_options = first_part_fields[5].split(',')
+
+        # Filesystem type, mount source, and super options are in the last part
+        filesystem_type = last_part_fields[0]
+        mount_source = last_part_fields[1]
+        super_options = last_part_fields[2].split(',') if len(last_part_fields) > 2 else []
+
+        mount_entry = {
+            "mount_id": mount_id,
+            "parent_id": parent_id,
+            "major_minor": major_minor,
+            "root": root,
+            "mount_point": mount_point,
+            "mount_options": mount_options,
+            "filesystem_type": filesystem_type,
+            "mount_source": mount_source,
+            "super_options": super_options,
+            "raw_line": line.strip()
         }
+        mount_entries.append(mount_entry)
+
+    return mount_entries
 
 
-def parse_mtab():
+def parse_mountinfo():
     """
-    Parses /etc/mtab (or /proc/self/mounts) and yields a dictionary for each entry.
+    Parses /proc/self/mountinfo (or /proc/mountinfo) returns a dictionary for each entry.
     """
     try:
-        # with open("/etc/mtab", "r") as fobj:
-        #    generator_object = parse_mtab_alike(fobj)
-        fobj = open("/etc/mtab", "r")
-        generator_object = parse_mtab_alike(fobj)
+        with open("/proc/self/mountinfo", "r") as fobj:
+            mount_entries = parse_mountinfo_alike(fobj)
     except FileNotFoundError:
-        log.warning("/etc/mtab not found. Trying /proc/self/mounts.")
+        log.warning("/proc/self/mountinfo not found. Trying /proc/mountinfo.")
         try:
-            # with open("/proc/self/mounts", "r") as fobj:
-            #    generator_object = parse_mtab_alike(fobj)
-            fobj = open("/proc/self/mounts", "r")
-            generator_object = parse_mtab_alike(fobj)
+            with open("/proc/mountinfo", "r") as fobj:
+                mount_entries = parse_mountinfo_alike(fobj)
         except FileNotFoundError:
-            log.error("Could not open /proc/self/mounts.")
+            log.error("Could not open /proc/self/mountinfo nor /proc/mountinfo")
+            raise
 
-    for mount in generator_object:
-        yield mount
+    return mount_entries
 
 
 def resolve_data_store(filepath):
@@ -75,15 +88,15 @@ def resolve_data_store(filepath):
     Get the data store name and the absolute path from the data store.
     filepath: The filepath argument given to the program
     """
-    # Read the /etc/mtab file to get the data store and mount point
+    # Read the /proc/self/mountinfo file to get the data store and mount point
     # Example usage
     data_store = None
     fpath = None
     mp_match_len = 0
     log.info("Currently mounted filesystems:")
-    for mount in parse_mtab():
+    for mount in parse_mountinfo():
         log.debug(
-            f"Device: {mount['device']:<20} Mount Point: {mount['mount_point']:<20} FS Type: {mount['fs_type']:<10} Options: {mount['options']}"
+            f"Source: {mount['mount_source']:<20} Mount Point: {mount['mount_point']:<20} FS Type: {mount['filesystem_type']:<10} Options: {mount['super_options']}"
         )
         if mount["mount_point"] == "/":
             # Skip this - every path will match it
@@ -94,11 +107,11 @@ def resolve_data_store(filepath):
             and len(mount["mount_point"]) > mp_match_len
         ):
             mp_match_len = len(mount["mount_point"])
-            dev_dir = mount["device"].split(":")
+            dev_dir = mount["mount_source"].split(":")
             data_store = dev_dir[0]
             if len(dev_dir) == 2:
-                # There is a path associated with the device. Replace the mount point with this path.
-                fpath = dev_dir[1] + filepath[len(mount["mount_point"]) :]
+                # There is a path associated with the mount_source. Replace the mount point with this path.
+                fpath = dev_dir[1] + filepath[mp_match_len:]
             else:
                 fpath = filepath
 

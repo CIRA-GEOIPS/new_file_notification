@@ -32,22 +32,22 @@ Run this with the -h (--help) argument to see the available flagged arguments.
 ## Running a consumer
 Get the config.ini file created and filled in as described above.
 
-The consumer is meant to be run in a Docker container using docker-compose. The
+The consumer is meant to be run in a Docker container using docker compose. The
 Docker image includes the needed Python environment.
 
 If the image needs to be built, run:
 ```
-docker-compose build
+docker compose build
 ```
 Run the consumer with:
 ```
-docker-compose up [-d]
+docker compose up [-d]
 ```
 The `-d` with run it detached from the terminal.
 
 This will start up a persistent process that will consume the new file
 notifications and use them to add the files metadata to the DB.
 
-If it is run in a detached state a `docker-compose down` will stop it. If not,
+If it is run in a detached state a `docker compose down` will stop it. If not,
 terminate it with Ctrl-C, wait ~10 seconds for it to stop, and then run
-`docker-compose down`.
+`docker compose down`.
