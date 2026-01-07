@@ -16,7 +16,9 @@ services:
       - database:${DB_IP}
     volumes:
       - ./:/app
-      - /:/data_store
+      - /mnt/ahi:/mnt/ahi:ro
+      - /mnt/sat:/mnt/sat:ro
+      - /mnt/grb:/mnt/grb:ro
 
     working_dir: /app
 
