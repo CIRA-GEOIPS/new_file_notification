@@ -32,4 +32,6 @@ EXPOSE 5000
 
 RUN pip install --no-cache-dir geoips xxhash psycopg2 pika
 
+RUN GEOIPS_OUTDIRS=/app/geoips_outdirs geoips config create-registries
+
 ENTRYPOINT [ "python", "/app/new_file_notification/get_file_notif.py" ]

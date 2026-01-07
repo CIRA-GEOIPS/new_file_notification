@@ -40,10 +40,7 @@ def consume_notification(config):
             log.info('Got a DB row')
             log.info(f"Before: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
 
-        tstart = '2013-06-29 11:18:33'
-        tend = '2013-06-29 12:57:33'
-        upsert_fpath = os.path.join("/data_store", file_info['filepath'][1:])
-        result = dic.upsert_file(upsert_fpath, file_info['product'], file_info['version'], tstart, tend, size=0)
+        result = dic.upsert_file(file_info['filepath'], file_info['data_store'])
         log.info(f"upsert result: {result}")
 
         rows = dic.find_files(filenames = fname)
@@ -56,7 +53,7 @@ def consume_notification(config):
 
     # Create the data inventory client object and allow it to be sent to the
     # rabbitmq callback
-    dic = DIClient(user='geoips', data_mount_dir='/data_store')
+    dic = DIClient(user='geoips')
     bound_callback = partial(callback, custom_object=dic)
 
     # Set up "whichever's ready" dispatching
