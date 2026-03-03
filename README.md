@@ -29,6 +29,14 @@ python file_notification.py [-h] [-v] [-p PRODUCT] [-r VERSION] [-s START_TIME] 
 ```
 Run this with the -h (--help) argument to see the available flagged arguments.
 
+This will usually be run with just the `filepath` argument. An example is:
+```
+python new_file_notification/file_notification.py /full/path/to/local/file/data_file.hdf
+```
+If run from a local repository of this project.
+
+The `filepath` file must exist on the local machine.
+
 ## Running a consumer
 Get the config.ini file created and filled in as described above.
 
