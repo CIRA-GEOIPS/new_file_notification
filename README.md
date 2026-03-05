@@ -14,6 +14,17 @@ expected that multiple consumers process will be accepting messages in
 RabbitMQ's "fair dispatch" configuration. A given notification will be received
 by one consumer.
 
+The "downloader" `download_tlm_data.py` queries the BCTM OPS telemetry API
+(https://api.bctmops.com/tlm) and downloads telemetry data files to a local
+directory.  The API is documented at
+https://docs.bctmops.com/apidocs/?url=https://api.bctmops.com/tlm/openapi.json
+
+## Configuration
+Copy `template-config.ini` to `config.ini` and edit the values as described
+inside that file.  The `ACCESS_TOKEN` setting is required by
+`download_tlm_data.py`.  The `TLM_API_URL` setting is optional and defaults to
+`https://api.bctmops.com/tlm`.
+
 ## Running the producer
 This must be run in a Python environment that includes `pika` - for connecting
 to RabbitMQ -  and other needed packages. The `environ-3.8.yml` file in this
@@ -59,3 +70,28 @@ notifications and use them to add the files metadata to the DB.
 If it is run in a detached state a `docker compose down` will stop it. If not,
 terminate it with Ctrl-C, wait ~10 seconds for it to stop, and then run
 `docker compose down`.
+
+## Running the telemetry data downloader
+Ensure `config.ini` contains a valid `ACCESS_TOKEN` under `[Settings]`.
+
+Run the downloader with:
+```
+python new_file_notification/download_tlm_data.py [-h] [-v] [-s START_TIME] [-e END_TIME] [--satellite SATELLITE] [-p PRODUCT] [-o OUTPUT_DIR]
+```
+Run this with the `-h` (`--help`) argument to see all available options.
+
+Example — download all available files to a `./tlm_data` directory:
+```
+python new_file_notification/download_tlm_data.py -o ./tlm_data
+```
+
+Example — download files for a specific time range:
+```
+python new_file_notification/download_tlm_data.py \
+    -s 2024-01-01T00:00:00Z \
+    -e 2024-01-02T00:00:00Z \
+    -o ./tlm_data
+```
+
+The script queries `https://api.bctmops.com/tlm/files` with the supplied
+filters, then downloads each returned file to the output directory.
