@@ -9,6 +9,7 @@ from functools import partial
 
 # GeoIPS modules: the data inventory client
 from data_inv_api import DIClient
+from data_inv_api.errors import DIClientError, DIClientPgError
 
 DESCRIPTION = """
 Receives a new file notification from the GeoIPS RabbitMQ "New File
@@ -34,19 +35,37 @@ def consume_notification(config):
     def callback(ch, method, properties, body, custom_object):
         file_info = json.loads(body.decode())
         log.info(f" [x] Received file_info: {file_info}")
-        fname = os.path.basename(file_info['filepath'])
-        rows = dic.find_files(filenames = fname)
-        for row in rows:
-            log.info('Got a DB row')
-            log.info(f"Before: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
+        try:
+            fname = os.path.basename(file_info['filepath'])
+            rows = dic.find_files(filenames = fname)
+            for row in rows:
+                log.info('Got a DB row')
+                log.info(f"Before: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
 
-        result = dic.upsert_file(file_info['filepath'], file_info['data_store'])
-        log.info(f"upsert result: {result}")
+            result = dic.upsert_file(file_info['filepath'], file_info['data_store'])
+            log.info(f"upsert result: {result}")
 
-        rows = dic.find_files(filenames = fname)
-        for row in rows:
-            log.info('Got a DB row')
-            log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
+            rows = dic.find_files(filenames = fname)
+            for row in rows:
+                log.info('Got a DB row')
+                log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
+        except Exception as e:
+            # Log the exception with full traceback and keep going
+            if file_info['data_store']:
+                data_store = file_info['data_store']
+            else:
+                data_store = "None"
+
+            if file_info['filepath']:
+                filepath = file_info['filepath']
+            else:
+                filepath = "None"
+            
+            msg = (
+              f"Handling of file notification failed, data_store:"
+              f" {data_store}, filepath: {filepath}"
+            )
+            log.exception(msg)
 
         log.info(" [x] Done")
         ch.basic_ack(delivery_tag=method.delivery_tag)
