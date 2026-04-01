@@ -1,47 +1,28 @@
 ## new_file_notification
 
 ## Description
-Uses RabbitMQ to send and receive new file notifications, with the ultimate
-purpose of getting the file metadata into the Data Inventory Database.
+Uses RabbitMQ to receive new file notifications, with the ultimate purpose of
+getting the file metadata into the Data Inventory Database.
 
-The "producer" `file_notification.py` will usually be called by the CIRA data
-ingest scripts when a new file is added to the CIRA data stores, and will send
-a message through RabbitMQ to the consumers with the file's metadata.
+The new file notifications are sent by the `ygd` command installed with the
+`youvegotdata` PyPi module: `pip install youvegotdata`. This command is the
+"producer." It is usually called by the CIRA data ingest scripts when a new
+file is added to the CIRA data stores, and will send a message through RabbitMQ
+to this project's consumers with the file's metadata.
 
-The "consumer" `get_file_notif.py` will be called by the GeoIPS governance
-system to receive the file metadata and insert it into the database. It is
-expected that multiple consumers process will be accepting messages in
-RabbitMQ's "fair dispatch" configuration. A given notification will be received
-by one consumer.
+The "consumer" `get_file_notif.py` is run in a container started up by this
+project. The container will be created by the GeoIPS governance system to
+receive the file metadata and insert it into the database. It is expected that
+multiple containers will be created to accepting messages in RabbitMQ's "fair
+dispatch" configuration. A given notification will be received by one
+consumer.
 
-## Running the producer
-This must be run in a Python environment that includes `pika` - for connecting
-to RabbitMQ -  and other needed packages. The `environ-3.8.yml` file in this
-repository can be used to create a workable conda environment. Setting one up
-using `pip` will certainly also work. Python 3.8 is the minimum version needed
-to run the script. Higher versions should work.
+## Running a consumer (receiver)
+The consumer is meant to be run in a Docker container using docker compose. The
+Docker image includes the needed Python environment.
 
 Copy the template-config.ini file to config.ini and edit the config.ini as
 described inside that file.
-Run the code with:
-```
-python file_notification.py [-h] [-v] [-p PRODUCT] [-r VERSION] [-s START_TIME] [-e END_TIME] [-l LENGTH] [-c CHECKSUM] [-t CHECKSUM_TYPE] filepath
-```
-Run this with the -h (--help) argument to see the available flagged arguments.
-
-This will usually be run with just the `filepath` argument. An example is:
-```
-python new_file_notification/file_notification.py /full/path/to/local/file/data_file.hdf
-```
-If run from a local repository of this project.
-
-The `filepath` file must exist on the local machine.
-
-## Running a consumer
-Get the config.ini file created and filled in as described above.
-
-The consumer is meant to be run in a Docker container using docker compose. The
-Docker image includes the needed Python environment.
 
 If the image needs to be built, run:
 ```
