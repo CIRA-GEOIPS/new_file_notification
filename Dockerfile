@@ -5,10 +5,10 @@ LABEL org.opencontainers.image.authors="Jim Fluke <james.fluke@colostate.edu>"
 ARG INV_API_TOKEN
 
 #ARG INV_API_VERSION=@1.8.6
-ARG INV_API_VERSION=
+ARG INV_API_VERSION=latest
 
 RUN git config --global http.sslverify false && \
-    pip install --no-cache-dir git+https://whatever:${INV_API_TOKEN}@bear.cira.colostate.edu/geoips/data_inv_api
+    pip install --no-cache-dir git+https://whatever:${INV_API_TOKEN}@bear.cira.colostate.edu/geoips/data_inv_api@${INV_API_VERSION}
 
 RUN pip show xxhash
 

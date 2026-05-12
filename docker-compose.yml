@@ -8,7 +8,7 @@ services:
         - INV_API_TOKEN=${ACCESS_TOKEN}
 
     image: get_file_notif
-    container_name: get_file_notif
+    #container_name: get_file_notif
 
     user: ${UID}:${GID}
     extra_hosts:
