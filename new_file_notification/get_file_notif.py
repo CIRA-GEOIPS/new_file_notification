@@ -19,9 +19,53 @@ DB.
 
 log = logging.getLogger(__name__)
 
+def notif_callback(ch, method, properties, body, custom_object):
+    """The recieve message callback function"""
+    file_info = json.loads(body.decode())
+    dic = custom_object
+    log.info(f" [x] Received file_info: {file_info}")
+    try:
+        fname = os.path.basename(file_info['filepath'])
+        rows = dic.find_files(filenames = fname)
+        for row in rows:
+            log.info('Got a DB row')
+            log.info(f"Before: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
 
-def consume_notification(config):
-    # Establish connection and create a channel on that connection
+        result = dic.upsert_file(file_info['filepath'], file_info['data_store'])
+        log.info(f"upsert result: {result}")
+
+        rows = dic.find_files(filenames = fname)
+        for row in rows:
+            log.info('Got a DB row')
+            log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
+    except Exception as e:
+        # Log the exception with full traceback and keep going
+        if file_info['data_store']:
+            data_store = file_info['data_store']
+        else:
+            data_store = "None"
+
+        if file_info['filepath']:
+            filepath = file_info['filepath']
+        else:
+            filepath = "None"
+        
+        msg = (
+          f"Handling of file notification failed, data_store:"
+          f" {data_store}, filepath: {filepath}"
+        )
+        log.exception(msg)
+
+    log.info(" [x] Done")
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+    log.info(" Done with 'ch.basic_ack'")
+
+
+def connect_to_queue(config):
+    """
+    Establish or re-establish the connection and create a channel on that
+    connection
+    """
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(host=config["Settings"]["RMQ_HOST"])
     )
@@ -29,51 +73,11 @@ def consume_notification(config):
 
     # Ensure the durable task_queue exists
     channel.queue_declare(queue="file_notif_queue", durable=True)
-    log.info(" [*] Waiting for messages. To exit press CTRL+C")
-
-    # Create the recieve callback function
-    def callback(ch, method, properties, body, custom_object):
-        file_info = json.loads(body.decode())
-        log.info(f" [x] Received file_info: {file_info}")
-        try:
-            fname = os.path.basename(file_info['filepath'])
-            rows = dic.find_files(filenames = fname)
-            for row in rows:
-                log.info('Got a DB row')
-                log.info(f"Before: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
-
-            result = dic.upsert_file(file_info['filepath'], file_info['data_store'])
-            log.info(f"upsert result: {result}")
-
-            rows = dic.find_files(filenames = fname)
-            for row in rows:
-                log.info('Got a DB row')
-                log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
-        except Exception as e:
-            # Log the exception with full traceback and keep going
-            if file_info['data_store']:
-                data_store = file_info['data_store']
-            else:
-                data_store = "None"
-
-            if file_info['filepath']:
-                filepath = file_info['filepath']
-            else:
-                filepath = "None"
-            
-            msg = (
-              f"Handling of file notification failed, data_store:"
-              f" {data_store}, filepath: {filepath}"
-            )
-            log.exception(msg)
-
-        log.info(" [x] Done")
-        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     # Create the data inventory client object and allow it to be sent to the
     # rabbitmq callback
     dic = DIClient(user='geoips')
-    bound_callback = partial(callback, custom_object=dic)
+    bound_callback = partial(notif_callback, custom_object=dic)
 
     # Set up "whichever's ready" dispatching
     # Register the callback function with rabbitmq
@@ -81,8 +85,22 @@ def consume_notification(config):
     channel.basic_consume(queue="file_notif_queue",
       on_message_callback=bound_callback)
 
-    # Start the message checking loop
-    channel.start_consuming()
+    return channel
+
+def consume_notification(config):
+    """Get the notifications and add the files to the DB"""
+    channel = connect_to_queue(config)
+
+    # Start the "reconnection on error" loop
+    while True:
+        # Start the message checking loop
+        log.info(" [*] Waiting for messages. To exit press CTRL+C")
+        try:
+            channel.start_consuming()
+        except (OSError, ConnectionResetError) as e:
+            log.exception(e)
+            log.info("Reconnecting to RabbitMQ")
+            channel = connect_to_queue(config)
 
 
 def main():
