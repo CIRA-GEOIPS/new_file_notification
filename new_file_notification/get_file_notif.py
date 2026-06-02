@@ -25,19 +25,38 @@ def notif_callback(ch, method, properties, body, custom_object):
     dic = custom_object
     log.info(f" [x] Received file_info: {file_info}")
     try:
+        do_upsert = True
         fname = os.path.basename(file_info['filepath'])
         rows = dic.find_files(filenames = fname)
         for row in rows:
             log.info('Got a DB row')
-            log.info(f"Before: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
+            log.info(
+                f"Before: file_name: {row.get('file_name')}, location:"
+                f" {row.get('location')}, dir_path: {row.get('dir_path')},"
+                f" size: {row.get('size')}"
+            )
+            db_fpath = os.path.join(row.get("dir_path"), row.get("file_name"))
+            local_fpath = data_inv_api.pg_di_client.get_local_fpath(db_fpath, row.get("location"))
+            curr_size = os.path.getsize(local_fpath)
 
-        result = dic.upsert_file(file_info['filepath'], file_info['data_store'])
-        log.info(f"upsert result: {result}")
+            if (
+                db_fpath == file_info['filepath'] and row.get('location') ==
+                file_info['data_store'] and row.get('size') == curr_size
+            ):
+                do_upsert = False
+                log.info(
+                    f"row.get('file_name') is already in the DB. Not upserting"
+                )
+    
+        if do_upsert:
+            result = dic.upsert_file(file_info['filepath'], file_info['data_store'])
+            log.info(f"upsert result: {result}")
 
-        rows = dic.find_files(filenames = fname)
-        for row in rows:
-            log.info('Got a DB row')
-            log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
+            rows = dic.find_files(filenames = fname)
+            for row in rows:
+                log.info('Got a DB row')
+                log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
+
     except Exception as e:
         # Log the exception with full traceback and keep going
         if file_info['data_store']:

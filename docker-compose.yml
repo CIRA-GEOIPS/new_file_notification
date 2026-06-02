@@ -5,6 +5,8 @@ services:
     build: 
       context: .
       args:
+        - GITHUB_TOKEN=${GITHUB_TOKEN}
+        - GIT_UNAME=${GIT_UNAME}
         - INV_API_TOKEN=${ACCESS_TOKEN}
 
     image: get_file_notif
@@ -19,6 +21,7 @@ services:
       - /mnt/ahi:/mnt/ahi:ro
       - /mnt/sat:/mnt/sat:ro
       - /mnt/grb:/mnt/grb:ro
+      - /mnt/overcastnas1:/mnt/overcastnas1:ro
 
     working_dir: /app
 
