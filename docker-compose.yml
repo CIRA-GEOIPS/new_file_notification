@@ -8,6 +8,7 @@ services:
         - GITHUB_TOKEN=${GITHUB_TOKEN}
         - GIT_UNAME=${GIT_UNAME}
         - INV_API_TOKEN=${ACCESS_TOKEN}
+        - INV_API_VERSION=${INV_API_VERSION:-}
 
     image: get_file_notif
     #container_name: get_file_notif

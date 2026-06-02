@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir geoips xxhash psycopg2 pika
 ARG INV_API_TOKEN
 
 #ARG INV_API_VERSION=@1.8.6
-ARG INV_API_VERSION=latest
+ARG INV_API_VERSION
 
 # Change this to force a rebuild from this point
 RUN echo "re-install 0"
