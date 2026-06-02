@@ -17,3 +17,9 @@ dependencies = ["pika"]
 authors = [
   {name = "Jim Fluke", email = "james.fluke@colostate.edu" }
 ]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
