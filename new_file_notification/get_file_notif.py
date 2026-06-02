@@ -97,7 +97,7 @@ def consume_notification(config):
         log.info(" [*] Waiting for messages. To exit press CTRL+C")
         try:
             channel.start_consuming()
-        except (OSError, ConnectionResetError) as e:
+        except (OSError, pika.exceptions.AMQPConnectionError) as e:
             log.exception(e)
             log.info("Reconnecting to RabbitMQ")
             channel = connect_to_queue(config)
