@@ -8,6 +8,7 @@ import configparser
 from functools import partial
 
 # GeoIPS modules: the data inventory client
+import data_inv_api.pg_di_client as diapi
 from data_inv_api import DIClient
 from data_inv_api.errors import DIClientError, DIClientPgError
 
@@ -36,17 +37,21 @@ def notif_callback(ch, method, properties, body, custom_object):
                 f" size: {row.get('size')}"
             )
             db_fpath = os.path.join(row.get("dir_path"), row.get("file_name"))
-            local_fpath = data_inv_api.pg_di_client.get_local_fpath(db_fpath, row.get("location"))
+            local_fpath = diapi.get_local_fpath(db_fpath, row.get("location"))
             curr_size = os.path.getsize(local_fpath)
+            log.info(
+                f"Before: local_fpath: {local_fpath}, curr_size: {curr_size}"
+            )
 
             if (
                 db_fpath == file_info['filepath'] and row.get('location') ==
                 file_info['data_store'] and row.get('size') == curr_size
             ):
-                do_upsert = False
                 log.info(
-                    f"row.get('file_name') is already in the DB. Not upserting"
+                    f"{row.get('file_name')} is already in the DB. Not"
+                    f" upserting"
                 )
+                do_upsert = False
     
         if do_upsert:
             result = dic.upsert_file(file_info['filepath'], file_info['data_store'])

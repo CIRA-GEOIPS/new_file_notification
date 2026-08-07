@@ -23,6 +23,8 @@ services:
       - /mnt/sat:/mnt/sat:ro
       - /mnt/grb:/mnt/grb:ro
       - /mnt/overcastnas1:/mnt/overcastnas1:ro
+      - /mnt/MTG-I1:/mnt/MTG-I1:ro
+      - /mnt/ahi-nas4:/mnt/ahi-nas4:ro
 
     working_dir: /app
 
@@ -30,4 +32,4 @@ services:
       - .env
 
     network_mode: ${DOCKER_NETWORK}
-    entrypoint: python /app/new_file_notification/get_file_notif.py
+    entrypoint: ${COMMAND}
