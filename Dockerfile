@@ -23,11 +23,11 @@ ARG INV_API_VERSION
 RUN echo "re-install 0"
 
 RUN git config --global http.sslverify false && \
-    pip install --no-cache-dir git+https://whatever:${INV_API_TOKEN}@bear.cira.colostate.edu/geoips/data_inv_api@${INV_API_VERSION}
+    pip install --no-cache-dir git+https://whatever:${INV_API_TOKEN}@bear.cira.colostate.edu/geoips/data_inv_api${INV_API_VERSION}
 
 #RUN pip show xxhash
 
-RUN pip install git+https://github.com/NRLMMD-GEOIPS/geoips_clavrx@biosafetylvl5-patch-1
+RUN pip install git+https://github.com/NRLMMD-GEOIPS/geoips_clavrx
 
 ARG GITHUB_TOKEN
 ARG GIT_UNAME

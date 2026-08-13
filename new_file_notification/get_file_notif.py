@@ -54,7 +54,14 @@ def notif_callback(ch, method, properties, body, custom_object):
                 do_upsert = False
     
         if do_upsert:
-            result = dic.upsert_file(file_info['filepath'], file_info['data_store'])
+            result = dic.upsert_file(
+                file_info['filepath'], file_info['data_store'],
+                file_info['product'], file_info['version'],
+                file_info['platform_name'], file_info['source_name'],
+                file_info['addl_metadata'], file_info['start_time'],
+                file_info['end_time'], file_info['checksum'],
+                file_info['size']
+            )
             log.info(f"upsert result: {result}")
 
             rows = dic.find_files(filenames = fname)
