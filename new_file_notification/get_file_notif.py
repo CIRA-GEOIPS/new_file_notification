@@ -8,6 +8,7 @@ import configparser
 from functools import partial
 
 # GeoIPS modules: the data inventory client
+import data_inv_api.pg_di_client as diapi
 from data_inv_api import DIClient
 from data_inv_api.errors import DIClientError, DIClientPgError
 
@@ -25,19 +26,49 @@ def notif_callback(ch, method, properties, body, custom_object):
     dic = custom_object
     log.info(f" [x] Received file_info: {file_info}")
     try:
+        do_upsert = True
         fname = os.path.basename(file_info['filepath'])
         rows = dic.find_files(filenames = fname)
         for row in rows:
             log.info('Got a DB row')
-            log.info(f"Before: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
+            log.info(
+                f"Before: file_name: {row.get('file_name')}, location:"
+                f" {row.get('location')}, dir_path: {row.get('dir_path')},"
+                f" size: {row.get('size')}"
+            )
+            db_fpath = os.path.join(row.get("dir_path"), row.get("file_name"))
+            local_fpath = diapi.get_local_fpath(db_fpath, row.get("location"))
+            curr_size = os.path.getsize(local_fpath)
+            log.info(
+                f"Before: local_fpath: {local_fpath}, curr_size: {curr_size}"
+            )
 
-        result = dic.upsert_file(file_info['filepath'], file_info['data_store'])
-        log.info(f"upsert result: {result}")
+            if (
+                db_fpath == file_info['filepath'] and row.get('location') ==
+                file_info['data_store'] and row.get('size') == curr_size
+            ):
+                log.info(
+                    f"{row.get('file_name')} is already in the DB. Not"
+                    f" upserting"
+                )
+                do_upsert = False
+    
+        if do_upsert:
+            result = dic.upsert_file(
+                file_info['filepath'], file_info['data_store'],
+                file_info.get('product'), file_info.get('version'),
+                file_info.get('platform_name'), file_info.get('source_name'),
+                file_info.get('addl_metadata'), file_info.get('start_time'),
+                file_info.get('end_time'), file_info.get('checksum'),
+                file_info.get('size', file_info.get('length'))
+            )
+            log.info(f"upsert result: {result}")
 
-        rows = dic.find_files(filenames = fname)
-        for row in rows:
-            log.info('Got a DB row')
-            log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
+            rows = dic.find_files(filenames = fname)
+            for row in rows:
+                log.info('Got a DB row')
+                log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
+
     except Exception as e:
         # Log the exception with full traceback and keep going
         if file_info['data_store']:
@@ -97,7 +128,11 @@ def consume_notification(config):
         log.info(" [*] Waiting for messages. To exit press CTRL+C")
         try:
             channel.start_consuming()
-        except (OSError, ConnectionResetError) as e:
+        except (
+            OSError,
+            pika.exceptions.AMQPConnectionError,
+            pika.exceptions.StreamLostError
+        ) as e:
             log.exception(e)
             log.info("Reconnecting to RabbitMQ")
             channel = connect_to_queue(config)

@@ -35,8 +35,25 @@ docker compose up [-d]
 The `-d` with run it detached from the terminal.
 
 This will start up a persistent process that will consume the new file
-notifications and use them to add the files metadata to the DB.
+notifications and use them to add the file metadata to the DB.
+
+With the RabbitMQ `file_notif_queue` configured for `fair dispatch` mode,
+container replication will "just work" for this project.
+```
+docker compose up -d --scale get_file_notif=3
+```
+In this case, three `get_file_notif.py` processes will be available to handle
+the incoming messages.
 
 If it is run in a detached state a `docker compose down` will stop it. If not,
 terminate it with Ctrl-C, wait ~10 seconds for it to stop, and then run
 `docker compose down`.
+
+## Updates
+This `pip install`'s the `data_inv_api` into the Docker image, so the image
+needs to be rebuilt, as shown above, whenever there is an update to the API
+that is needed by this consumer. Such as when the ability to ingest a new
+dataset has been added.
+
+Also, on an API update, add any new data server mounts in the API's
+docker-compose.dev.yml to this project's docker-compose.yml.
