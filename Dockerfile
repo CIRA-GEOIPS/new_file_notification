@@ -32,6 +32,7 @@ RUN pip install git+https://github.com/NRLMMD-GEOIPS/geoips_clavrx
 ARG GITHUB_TOKEN
 ARG GIT_UNAME
 RUN pip install git+https://${GIT_UNAME}:${GITHUB_TOKEN}@github.com/NRLMMD-GEOIPS/overcast_package@overcast-package-overhaul
+RUN pip install git+https://${GIT_UNAME}:${GITHUB_TOKEN}@github.com/CIRA-GEOIPS/geoips_unetcomp
 
 #RUN find / -name data_inv_api
 

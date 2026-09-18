@@ -56,11 +56,11 @@ def notif_callback(ch, method, properties, body, custom_object):
         if do_upsert:
             result = dic.upsert_file(
                 file_info['filepath'], file_info['data_store'],
-                file_info['product'], file_info['version'],
-                file_info['platform_name'], file_info['source_name'],
-                file_info['addl_metadata'], file_info['start_time'],
-                file_info['end_time'], file_info['checksum'],
-                file_info['size']
+                file_info.get('product'), file_info.get('version'),
+                file_info.get('platform_name'), file_info.get('source_name'),
+                file_info.get('addl_metadata'), file_info.get('start_time'),
+                file_info.get('end_time'), file_info.get('checksum'),
+                file_info.get('size', file_info.get('length'))
             )
             log.info(f"upsert result: {result}")
 
