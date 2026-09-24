@@ -20,15 +20,18 @@ DB.
 
 log = logging.getLogger(__name__)
 
-def notif_callback(ch, method, properties, body, custom_object):
+def notif_callback(ch, method, properties, body, dic):
     """The recieve message callback function"""
-    file_info = json.loads(body.decode())
-    dic = custom_object
-    log.info(f" [x] Received file_info: {file_info}")
     try:
+        file_info = json.loads(body.decode())
+        log.info(f" [x] Received file_info: {file_info}")
+
         do_upsert = True
         fname = os.path.basename(file_info['filepath'])
+
+        # If the database down, we'll get an exception here first?
         rows = dic.find_files(filenames = fname)
+
         for row in rows:
             log.info('Got a DB row')
             log.info(
@@ -52,7 +55,7 @@ def notif_callback(ch, method, properties, body, custom_object):
                     f" upserting"
                 )
                 do_upsert = False
-    
+
         if do_upsert:
             result = dic.upsert_file(
                 file_info['filepath'], file_info['data_store'],
@@ -64,13 +67,27 @@ def notif_callback(ch, method, properties, body, custom_object):
             )
             log.info(f"upsert result: {result}")
 
+            # Do we need this check? Can upsert_file succeed partially?
             rows = dic.find_files(filenames = fname)
             for row in rows:
                 log.info('Got a DB row')
                 log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
 
-    except Exception as e:
+    except json.decoder.JSONDecoder:
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+        log.exception("Rejected non-JSON message with no requeuing. method=%r, body=%r", method, body)
+    # Errors of the first kind shouldn't be retried, they'll fail again (dead-lettered).
+    # Errors of the second kind should be retried (nacked).
+    except DIClientError:
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+        log.exception("Rejected unprocessable message with no requeuing. method=%r, file_info=%r", method, file_info)
+    except DIClientPgError:
+        ch.basic_nack(delivery_tag=method.delivery_tag)
+        log.exception("Failed to upsert message, requeuing. method=%r, file_info=%r", method, file_info)
+    except:
         # Log the exception with full traceback and keep going
+        ch.basic_nack(delivery_tag=method.delivery_tag)
+
         if file_info['data_store']:
             data_store = file_info['data_store']
         else:
@@ -86,10 +103,11 @@ def notif_callback(ch, method, properties, body, custom_object):
           f" {data_store}, filepath: {filepath}"
         )
         log.exception(msg)
+    else:
+        log.info(" [x] Done")
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+        log.info(" Done with 'ch.basic_ack'")
 
-    log.info(" [x] Done")
-    ch.basic_ack(delivery_tag=method.delivery_tag)
-    log.info(" Done with 'ch.basic_ack'")
 
 
 def connect_to_queue(config):
