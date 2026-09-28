@@ -76,6 +76,9 @@ def notif_callback(ch, method, properties, body, dic):
     except json.decoder.JSONDecodeError:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         log.exception("Rejected non-JSON message with no requeuing. method=%r, body=%r", method, body)
+    except (TypeError, KeyError):
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+        log.exception("Rejected JSON message that doesn't conform to the file info spec, with no requeuing. method=%r, body=%r", method, body)
     # Errors of the first kind shouldn't be retried, they'll fail again (dead-lettered).
     # Errors of the second kind should be retried (nacked).
     except DIClientError:
@@ -85,24 +88,8 @@ def notif_callback(ch, method, properties, body, dic):
         ch.basic_nack(delivery_tag=method.delivery_tag)
         log.exception("Failed to upsert message, requeuing. method=%r, file_info=%r", method, file_info)
     except:
-        # Log the exception with full traceback and keep going
         ch.basic_nack(delivery_tag=method.delivery_tag)
-
-        if file_info['data_store']:
-            data_store = file_info['data_store']
-        else:
-            data_store = "None"
-
-        if file_info['filepath']:
-            filepath = file_info['filepath']
-        else:
-            filepath = "None"
-        
-        msg = (
-          f"Handling of file notification failed, data_store:"
-          f" {data_store}, filepath: {filepath}"
-        )
-        log.exception(msg)
+        log.exception("Handling of file notification failed. file_info=%r", file_info)
     else:
         log.info(" [x] Done")
         ch.basic_ack(delivery_tag=method.delivery_tag)
