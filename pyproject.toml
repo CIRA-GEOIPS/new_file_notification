@@ -12,7 +12,11 @@ readme = "README.md"
 
 requires-python = ">=3.8"
 
-dependencies = ["pika"]
+dependencies = [
+  "pika",
+  "data_inv_api @ git+ssh://git@bear.cira.colostate.edu/geoips/data_inv_api.git",
+  "geoips @ git+ssh://git@github.com/NRLMMD-GEOIPS/geoips.git"
+]
 
 authors = [
   {name = "Jim Fluke", email = "james.fluke@colostate.edu" }

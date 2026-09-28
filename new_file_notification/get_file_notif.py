@@ -73,7 +73,7 @@ def notif_callback(ch, method, properties, body, dic):
                 log.info('Got a DB row')
                 log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
 
-    except json.decoder.JSONDecoder:
+    except json.decoder.JSONDecodeError:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         log.exception("Rejected non-JSON message with no requeuing. method=%r, body=%r", method, body)
     # Errors of the first kind shouldn't be retried, they'll fail again (dead-lettered).
