@@ -28,11 +28,25 @@ def notif_callback(ch, method, properties, body, dic):
         fname = os.path.basename(filepath)
     except json.decoder.JSONDecodeError:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-        log.exception("Rejected non-JSON message with no requeuing. method=%r, body=%r", method, body)
+        log.exception(
+            "Rejected non-JSON message with no requeuing. ch=%r, method=%r, properties=%r, body=%r, dic=%r",
+            ch,
+            method,
+            properties,
+            body,
+            dic,
+        )
         return
     except (TypeError, KeyError):
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-        log.exception("Rejected JSON message that doesn't conform to the file info spec, with no requeuing. method=%r, body=%r", method, body)
+        log.exception(
+            "Rejected JSON message that doesn't conform to the file info spec, with no requeuing. ch=%r, method=%r, properties=%r, body=%r, dic=%r",
+            ch,
+            method,
+            properties,
+            body,
+            dic,
+        )
         return
 
     log.info(f" [x] Received file_info: {file_info}")
@@ -85,23 +99,50 @@ def notif_callback(ch, method, properties, body, dic):
 
     except DIClientPgError:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
-        log.exception("Database connection failed, requeuing. method=%r, file_info=%r", method, file_info)
+        log.exception(
+            "Database connection failed, requeuing. ch=%r, method=%r, properties=%r, body=%r, dic=%r",
+            ch,
+            method,
+            properties,
+            body,
+            dic,
+        )
     except DIClientError:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-        log.exception("Rejected unprocessable message with no requeuing. method=%r, file_info=%r", method, file_info)
+        log.exception(
+            "Rejected unprocessable message with no requeuing. ch=%r, method=%r, properties=%r, body=%r, dic=%r",
+            ch,
+            method,
+            properties,
+            body,
+            dic,
+        )
     except FileNotFoundError:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
-        log.exception("Mount info not found, requeuing. method=%r, file_info=%r", method, file_info)
+        log.exception(
+            "Mount info not found, requeuing. ch=%r, method=%r, properties=%r, body=%r, dic=%r",
+            ch,
+            method,
+            properties,
+            body,
+            dic,
+        )
     except:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
-        log.exception("File notification callback failed. file_info=%r", file_info)
+        log.exception(
+            "File notification callback failed. ch=%r, method=%r, properties=%r, body=%r, dic=%r",
+            ch,
+            method,
+            properties,
+            body,
+            dic,
+        )
         # Presumably these are software defects and not infra failures.
         raise
     else:
         log.info(" [x] Done")
         ch.basic_ack(delivery_tag=method.delivery_tag)
         log.info(" Done with 'ch.basic_ack'")
-
 
 
 def connect_to_queue(config):

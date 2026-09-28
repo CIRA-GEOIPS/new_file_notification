@@ -99,7 +99,7 @@ def test_callback_upsert_failure_database_error(caplog):
     assert "Database connection failed" in caplog.text
 
 
-def test_callback_find_files_failure_database_error(caplog):
+def test_callback_find_files_database_error(caplog):
     """Callback nacks with requeuing when the file database doesn't respond."""
     pika_channel = Mock()
     data_inv_client = Mock()
@@ -120,6 +120,29 @@ def test_callback_find_files_failure_database_error(caplog):
         delivery_tag=method.delivery_tag, requeue=True
     )
     assert "Database connection failed" in caplog.text
+
+
+def test_callback_find_files_mount_info_failure(caplog):
+    """Callback nacks with requeuing when mount info can't be read."""
+    pika_channel = Mock()
+    data_inv_client = Mock()
+    conf = {"find_files.side_effect": FileNotFoundError}
+    data_inv_client.configure_mock(**conf)
+    method = Basic.Deliver()
+    properties = BasicProperties()
+
+    file_info = {"filepath": "bogus", "data_store": "bogus"}
+    body = json.dumps(file_info).encode("utf-8")
+    caplog.set_level(logging.ERROR)
+
+    get_file_notif.notif_callback(
+        pika_channel, method, properties, body, data_inv_client
+    )
+
+    pika_channel.basic_nack.assert_called_with(
+        delivery_tag=method.delivery_tag, requeue=True
+    )
+    assert "Mount info not found" in caplog.text
 
 
 def test_callback_reraise_unexpected_exceptions(caplog):
