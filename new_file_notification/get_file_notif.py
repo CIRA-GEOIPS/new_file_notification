@@ -24,13 +24,23 @@ def notif_callback(ch, method, properties, body, dic):
     """The recieve message callback function"""
     try:
         file_info = json.loads(body.decode())
-        log.info(f" [x] Received file_info: {file_info}")
+        filepath = file_info['filepath']
+        fname = os.path.basename(filepath)
+    except json.decoder.JSONDecodeError:
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+        log.exception("Rejected non-JSON message with no requeuing. method=%r, body=%r", method, body)
+        return
+    except (TypeError, KeyError):
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+        log.exception("Rejected JSON message that doesn't conform to the file info spec, with no requeuing. method=%r, body=%r", method, body)
+        return
 
-        do_upsert = True
-        fname = os.path.basename(file_info['filepath'])
+    log.info(f" [x] Received file_info: {file_info}")
+    do_upsert = True
 
+    try:
         # If the database down, we'll get an exception here first?
-        rows = dic.find_files(filenames = fname)
+        rows = dic.find_files(filenames=fname)
 
         for row in rows:
             log.info('Got a DB row')
@@ -73,23 +83,20 @@ def notif_callback(ch, method, properties, body, dic):
                 log.info('Got a DB row')
                 log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
 
-    except json.decoder.JSONDecodeError:
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-        log.exception("Rejected non-JSON message with no requeuing. method=%r, body=%r", method, body)
-    except (TypeError, KeyError):
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-        log.exception("Rejected JSON message that doesn't conform to the file info spec, with no requeuing. method=%r, body=%r", method, body)
-    # Errors of the first kind shouldn't be retried, they'll fail again (dead-lettered).
-    # Errors of the second kind should be retried (nacked).
+    except DIClientPgError:
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+        log.exception("Database connection failed, requeuing. method=%r, file_info=%r", method, file_info)
     except DIClientError:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         log.exception("Rejected unprocessable message with no requeuing. method=%r, file_info=%r", method, file_info)
-    except DIClientPgError:
-        ch.basic_nack(delivery_tag=method.delivery_tag)
-        log.exception("Failed to upsert message, requeuing. method=%r, file_info=%r", method, file_info)
+    except FileNotFoundError:
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+        log.exception("Mount info not found, requeuing. method=%r, file_info=%r", method, file_info)
     except:
-        ch.basic_nack(delivery_tag=method.delivery_tag)
-        log.exception("Handling of file notification failed. file_info=%r", file_info)
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+        log.exception("File notification callback failed. file_info=%r", file_info)
+        # Presumably these are software defects and not infra failures.
+        raise
     else:
         log.info(" [x] Done")
         ch.basic_ack(delivery_tag=method.delivery_tag)
