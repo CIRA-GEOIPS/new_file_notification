@@ -127,6 +127,10 @@ def notif_callback(ch, method, properties, body, dic):
             body,
             dic,
         )
+    # Below we handle all exceptions not intentionally raised by the
+    # data inventory client or callback itself.
+    # Presumably these are defects of this module or its dependencies
+    # and not infra failures.
     except:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
         log.exception(
@@ -137,12 +141,11 @@ def notif_callback(ch, method, properties, body, dic):
             body,
             dic,
         )
-        # Presumably these are software defects and not infra failures.
         raise
-    else:
-        log.info(" [x] Done")
-        ch.basic_ack(delivery_tag=method.delivery_tag)
-        log.info(" Done with 'ch.basic_ack'")
+
+    log.info(" [x] Done")
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+    log.info(" Done with 'ch.basic_ack'")
 
 
 def connect_to_queue(config):
