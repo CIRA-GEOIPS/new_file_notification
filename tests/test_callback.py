@@ -24,7 +24,7 @@ def test_callback_not_json(caplog, body):
     caplog.set_level(logging.ERROR)
 
     get_file_notif.notif_callback(
-        pika_channel, method, properties, body, data_inv_client
+        pika_channel, method, properties, body, dic=data_inv_client
     )
 
     pika_channel.basic_nack.assert_called_with(
@@ -44,7 +44,7 @@ def test_callback_non_conforming_json(caplog, info):
     caplog.set_level(logging.ERROR)
 
     get_file_notif.notif_callback(
-        pika_channel, method, properties, body, data_inv_client
+        pika_channel, method, properties, body, dic=data_inv_client
     )
 
     pika_channel.basic_nack.assert_called_with(
@@ -67,7 +67,7 @@ def test_callback_upsert_failure_bad_message(caplog):
     caplog.set_level(logging.ERROR)
 
     get_file_notif.notif_callback(
-        pika_channel, method, properties, body, data_inv_client
+        pika_channel, method, properties, body, dic=data_inv_client
     )
 
     pika_channel.basic_nack.assert_called_with(
@@ -90,7 +90,7 @@ def test_callback_upsert_failure_database_error(caplog):
     caplog.set_level(logging.ERROR)
 
     get_file_notif.notif_callback(
-        pika_channel, method, properties, body, data_inv_client
+        pika_channel, method, properties, body, dic=data_inv_client
     )
 
     pika_channel.basic_nack.assert_called_with(
@@ -113,7 +113,7 @@ def test_callback_find_files_database_error(caplog):
     caplog.set_level(logging.ERROR)
 
     get_file_notif.notif_callback(
-        pika_channel, method, properties, body, data_inv_client
+        pika_channel, method, properties, body, dic=data_inv_client
     )
 
     pika_channel.basic_nack.assert_called_with(
@@ -136,7 +136,7 @@ def test_callback_find_files_mount_info_failure(caplog):
     caplog.set_level(logging.ERROR)
 
     get_file_notif.notif_callback(
-        pika_channel, method, properties, body, data_inv_client
+        pika_channel, method, properties, body, dic=data_inv_client
     )
 
     pika_channel.basic_nack.assert_called_with(
@@ -160,7 +160,7 @@ def test_callback_reraise_unexpected_exceptions(caplog):
 
     with pytest.raises(RuntimeError):
         get_file_notif.notif_callback(
-            pika_channel, method, properties, body, data_inv_client
+            pika_channel, method, properties, body, dic=data_inv_client
         )
 
     pika_channel.basic_nack.assert_called_with(
@@ -183,7 +183,7 @@ def test_callback_success(caplog):
     caplog.set_level(logging.INFO)
 
     get_file_notif.notif_callback(
-        pika_channel, method, properties, body, data_inv_client
+        pika_channel, method, properties, body, dic=data_inv_client
     )
 
     pika_channel.basic_ack.assert_called_with(delivery_tag=method.delivery_tag)

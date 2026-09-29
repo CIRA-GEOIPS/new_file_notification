@@ -20,7 +20,7 @@ DB.
 
 log = logging.getLogger(__name__)
 
-def notif_callback(ch, method, properties, body, dic):
+def notif_callback(ch, method, properties, body, *, dic):
     """The receive message callback function
 
     Conforming messages about new files result in upsert to the
@@ -44,7 +44,8 @@ def notif_callback(ch, method, properties, body, dic):
     body: bytes
         The received message.
     dic: DIClient
-        Data inventory client instance.
+        Data inventory client instance. A mandatory keyword argument, to
+        allow partial application.
 
     """
     try:
@@ -196,7 +197,7 @@ def connect_to_queue(config):
     # Create the data inventory client object and allow it to be sent to the
     # rabbitmq callback
     dic = DIClient(user='geoips')
-    bound_callback = partial(notif_callback, custom_object=dic)
+    bound_callback = partial(notif_callback, dic=dic)
 
     # Set up "whichever's ready" dispatching
     # Register the callback function with rabbitmq
