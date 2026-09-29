@@ -13,13 +13,13 @@ import pytest
 from new_file_notification import get_file_notif
 
 
-def test_callback_not_json(caplog):
+@pytest.mark.parametrize("body", ["bogus", 5, '"bögus"'.encode("Windows-1252")])
+def test_callback_not_json(caplog, body):
     """Callback nacks with no requeuing when message contains no JSON."""
     pika_channel = Mock()
     data_inv_client = Mock()
     method = Basic.Deliver()
     properties = BasicProperties()
-    body = "bogus".encode("utf-8")
 
     caplog.set_level(logging.ERROR)
 
@@ -30,7 +30,7 @@ def test_callback_not_json(caplog):
     pika_channel.basic_nack.assert_called_with(
         delivery_tag=method.delivery_tag, requeue=False
     )
-    assert "Rejected non-JSON message" in caplog.text
+    assert "Rejected message that was not bytes, not UTF, or not JSON" in caplog.text
 
 
 @pytest.mark.parametrize("info", [[], {}, 5, "bogus"])
@@ -167,3 +167,24 @@ def test_callback_reraise_unexpected_exceptions(caplog):
         delivery_tag=method.delivery_tag, requeue=True
     )
     assert "callback failed" in caplog.text
+
+
+def test_callback_success(caplog):
+    """On success ack is sent."""
+    pika_channel = Mock()
+    data_inv_client = Mock()
+    conf = {"find_files.return_value": []}
+    data_inv_client.configure_mock(**conf)
+    method = Basic.Deliver()
+    properties = BasicProperties()
+
+    file_info = {"filepath": "bogus", "data_store": "bogus"}
+    body = json.dumps(file_info).encode("utf-8")
+    caplog.set_level(logging.INFO)
+
+    get_file_notif.notif_callback(
+        pika_channel, method, properties, body, data_inv_client
+    )
+
+    pika_channel.basic_ack.assert_called_with(delivery_tag=method.delivery_tag)
+    assert "[x] Done" in caplog.text

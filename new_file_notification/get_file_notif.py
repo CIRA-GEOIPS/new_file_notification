@@ -21,15 +21,39 @@ DB.
 log = logging.getLogger(__name__)
 
 def notif_callback(ch, method, properties, body, dic):
-    """The recieve message callback function"""
+    """The receive message callback function
+
+    Conforming messages about new files result in upsert to the
+    inventory database. If the upsert succeeds or is a no-op, the
+    message is ackowledged (ack).
+
+    Non-conforming messages are rejected with no requeuing (nack), and
+    the callback returns.  When database connections fail, messages are
+    sent back and requeued (nack), and the callback returns.  On an
+    unexpected error, the message is sent back and requeued (nack), and
+    the callback reraises the exception.
+
+    Parameters
+    ----------
+    ch :
+        Pika channel for ack/nack.
+    method :
+        RabbitMQ method. Unused.
+    properties:
+        RabbitMQ properties. Unused.
+    body: bytes
+        The received message.
+    dic: DIClient
+        Data inventory client instance.
+
+    """
     try:
-        file_info = json.loads(body.decode())
-        filepath = file_info['filepath']
-        fname = os.path.basename(filepath)
-    except json.decoder.JSONDecodeError:
+        file_info = json.loads(body)
+    except (TypeError, UnicodeDecodeError, json.decoder.JSONDecodeError):
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         log.exception(
-            "Rejected non-JSON message with no requeuing. ch=%r, method=%r, properties=%r, body=%r, dic=%r",
+            "Rejected message that was not bytes, not UTF, or not JSON. Message not requeued. "
+            "ch=%r, method=%r, properties=%r, body=%r, dic=%r",
             ch,
             method,
             properties,
@@ -37,10 +61,15 @@ def notif_callback(ch, method, properties, body, dic):
             dic,
         )
         return
+
+    try:
+        filepath = file_info["filepath"]
+        _ = file_info["data_store"]
     except (TypeError, KeyError):
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         log.exception(
-            "Rejected JSON message that doesn't conform to the file info spec, with no requeuing. ch=%r, method=%r, properties=%r, body=%r, dic=%r",
+            "Rejected JSON message that doesn't conform to file info spec. Not requeued. "
+            "ch=%r, method=%r, properties=%r, body=%r, dic=%r",
             ch,
             method,
             properties,
@@ -53,7 +82,7 @@ def notif_callback(ch, method, properties, body, dic):
     do_upsert = True
 
     try:
-        # If the database down, we'll get an exception here first?
+        fname = os.path.basename(filepath)
         rows = dic.find_files(filenames=fname)
 
         for row in rows:
@@ -91,7 +120,6 @@ def notif_callback(ch, method, properties, body, dic):
             )
             log.info(f"upsert result: {result}")
 
-            # Do we need this check? Can upsert_file succeed partially?
             rows = dic.find_files(filenames = fname)
             for row in rows:
                 log.info('Got a DB row')
@@ -100,7 +128,8 @@ def notif_callback(ch, method, properties, body, dic):
     except DIClientPgError:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
         log.exception(
-            "Database connection failed, requeuing. ch=%r, method=%r, properties=%r, body=%r, dic=%r",
+            "Database connection failed. Message requeued. "
+            "ch=%r, method=%r, properties=%r, body=%r, dic=%r",
             ch,
             method,
             properties,
@@ -110,7 +139,8 @@ def notif_callback(ch, method, properties, body, dic):
     except DIClientError:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         log.exception(
-            "Rejected unprocessable message with no requeuing. ch=%r, method=%r, properties=%r, body=%r, dic=%r",
+            "Rejected unprocessable message. Not requeued. "
+            "ch=%r, method=%r, properties=%r, body=%r, dic=%r",
             ch,
             method,
             properties,
@@ -120,7 +150,8 @@ def notif_callback(ch, method, properties, body, dic):
     except FileNotFoundError:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
         log.exception(
-            "Mount info not found, requeuing. ch=%r, method=%r, properties=%r, body=%r, dic=%r",
+            "Mount info not found. Message requeued. "
+            "ch=%r, method=%r, properties=%r, body=%r, dic=%r",
             ch,
             method,
             properties,
@@ -128,13 +159,14 @@ def notif_callback(ch, method, properties, body, dic):
             dic,
         )
     # Below we handle all exceptions not intentionally raised by the
-    # data inventory client or callback itself.
-    # Presumably these are defects of this module or its dependencies
-    # and not infra failures.
+    # data inventory client or callback itself.  Presumably these are
+    # defects of this module or its dependencies and not infra failures,
+    # requiring release and redeployment to fix.
     except:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
         log.exception(
-            "File notification callback failed. ch=%r, method=%r, properties=%r, body=%r, dic=%r",
+            "File notification callback failed due to unexpected error. Message requeued."
+            "ch=%r, method=%r, properties=%r, body=%r, dic=%r",
             ch,
             method,
             properties,
@@ -142,10 +174,10 @@ def notif_callback(ch, method, properties, body, dic):
             dic,
         )
         raise
-
-    log.info(" [x] Done")
-    ch.basic_ack(delivery_tag=method.delivery_tag)
-    log.info(" Done with 'ch.basic_ack'")
+    else:
+        log.info(" [x] Done")
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+        log.info(" Done with 'ch.basic_ack'")
 
 
 def connect_to_queue(config):
