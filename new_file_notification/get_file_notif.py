@@ -44,8 +44,7 @@ def notif_callback(ch, method, properties, body, dic):
     body: bytes
         The received message.
     dic: DIClient
-        Data inventory client instance. A mandatory keyword argument, to
-        allow partial application.
+        Data inventory client instance.
 
     """
     try:
