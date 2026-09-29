@@ -20,7 +20,7 @@ DB.
 
 log = logging.getLogger(__name__)
 
-def notif_callback(ch, method, properties, body, *, dic):
+def notif_callback(ch, method, properties, body, dic):
     """The receive message callback function
 
     Conforming messages about new files result in upsert to the
