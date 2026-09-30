@@ -4,7 +4,7 @@ availability.
 
 import json
 import logging
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from data_inv_api.errors import DIClientError, DIClientPgError
 from pika.spec import Basic, BasicProperties
@@ -76,27 +76,35 @@ def test_callback_upsert_failure_bad_message(caplog):
     assert "Rejected unprocessable message" in caplog.text
 
 
-def test_callback_upsert_failure_database_error(caplog):
+@pytest.mark.parametrize("delivery_count", [0, 1])
+@patch("new_file_notification.get_file_notif.time")
+def test_callback_upsert_failure_database_error(time, delivery_count, caplog):
     """Callback nacks with requeuing when the file database doesn't respond."""
     pika_channel = Mock()
     data_inv_client = Mock()
     conf = {"find_files.return_value": [], "upsert_file.side_effect": DIClientPgError}
     data_inv_client.configure_mock(**conf)
     method = Basic.Deliver()
-    properties = BasicProperties()
+    properties = BasicProperties(headers={"x-delivery-count": delivery_count})
 
     file_info = {"filepath": "bogus", "data_store": "bogus"}
     body = json.dumps(file_info).encode("utf-8")
-    caplog.set_level(logging.ERROR)
+    caplog.set_level(logging.INFO)
 
     get_file_notif.notif_callback(
         pika_channel, method, properties, body, dic=data_inv_client
     )
 
+    # Check the delay.
+    time.sleep.assert_called_once()
+    _, args, _ = time.sleep.mock_calls[0]
+    assert 2.0 * (1.5**delivery_count) <= args[0] <= 2.0 * (1.5**delivery_count) + 1.0
+
     pika_channel.basic_nack.assert_called_with(
         delivery_tag=method.delivery_tag, requeue=True
     )
     assert "Database connection failed" in caplog.text
+    assert "Nack sent after delay" in caplog.text
 
 
 def test_callback_find_files_database_error(caplog):

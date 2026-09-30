@@ -1,16 +1,19 @@
 #!/usr/bin/env python
-import sys, os
-import logging
 import argparse
-import pika
-import json
 import configparser
 from functools import partial
+import json
+import logging
+import os
+import pika
+import random
+import sys
+import time
 
 # GeoIPS modules: the data inventory client
-import data_inv_api.pg_di_client as diapi
 from data_inv_api import DIClient
 from data_inv_api.errors import DIClientError, DIClientPgError
+import data_inv_api.pg_di_client as diapi
 
 DESCRIPTION = """
 Receives a new file notification from the GeoIPS RabbitMQ "New File
@@ -126,15 +129,41 @@ def notif_callback(ch, method, properties, body, dic):
                 log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
 
     except DIClientPgError:
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+        # The client "dic" couldn't connect to the database.
+        # We will wait, giving the database time to recover or restart,
+        # before sending a nack.
         log.exception(
-            "Database connection failed. Message requeued. "
+            "Database connection failed. Message will be requeued. "
             "ch=%r, method=%r, properties=%r, body=%r, dic=%r",
             ch,
             method,
             properties,
             body,
             dic,
+        )
+        # The delay increases with delivery count and has 0-1.0 second
+        # of jitter to de-syncronize retries (best practice implemented
+        # in https://github.com/hynek/stamina).
+        headers = properties.headers or {}
+        delivery_count = headers.get("x-delivery-count", 0)
+        # TODO: make these configurable.
+        retry_delay_seconds = 2.0
+        retry_backoff_factor = 1.5
+        retry_delay_limit_seconds = 60.0
+        retry_jitter_max_seconds = 1.0
+        delay = min(
+            retry_delay_limit_seconds,
+            retry_delay_seconds * (retry_backoff_factor**delivery_count)
+            + random.uniform(0, retry_jitter_max_seconds),
+        )
+        time.sleep(delay)
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+        log.info(
+            "Nack sent after delay, with requeue. "
+            "delay(secs)=%r, delivery_count=%r, delivery_tag=%r",
+            delay,
+            delivery_count,
+            method.delivery_tag,
         )
     except DIClientError:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
