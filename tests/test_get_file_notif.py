@@ -67,7 +67,7 @@ def test_connect_to_queue_declares_and_binds_callback(notif_module, monkeypatch)
     assert kwargs["queue"] == "file_notif_queue"
     assert isinstance(kwargs["on_message_callback"], partial)
     assert kwargs["on_message_callback"].func is notif_module.notif_callback
-    assert kwargs["on_message_callback"].keywords["custom_object"].user == "geoips"
+    assert kwargs["on_message_callback"].keywords["dic"].user == "geoips"
 
 
 def test_consume_notification_reconnects_on_amqp_connection_error(notif_module, monkeypatch):
