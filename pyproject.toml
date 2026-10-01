@@ -12,7 +12,13 @@ readme = "README.md"
 
 requires-python = ">=3.8"
 
-dependencies = ["pika"]
+[dependency-groups]
+test = ["pytest-cov"]
+deps = [
+  "data_inv_api @ git+ssh://git@bear.cira.colostate.edu/geoips/data_inv_api.git",
+  "geoips",
+  "pika",
+]
 
 authors = [
   {name = "Jim Fluke", email = "james.fluke@colostate.edu" }
