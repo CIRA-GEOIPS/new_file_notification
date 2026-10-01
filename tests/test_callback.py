@@ -76,10 +76,59 @@ def test_callback_upsert_failure_bad_message(caplog):
     assert "Rejected unprocessable message" in caplog.text
 
 
-@pytest.mark.parametrize("delivery_count", [0, 1])
-@patch("new_file_notification.get_file_notif.time")
-def test_callback_upsert_failure_database_error(time, delivery_count, caplog):
+def test_callback_upsert_failure_database_error(caplog):
     """Callback nacks with requeuing when the file database doesn't respond."""
+    pika_channel = Mock()
+    data_inv_client = Mock()
+    conf = {"find_files.return_value": [], "upsert_file.side_effect": DIClientPgError}
+    data_inv_client.configure_mock(**conf)
+    method = Basic.Deliver()
+    properties = BasicProperties()
+
+    file_info = {"filepath": "bogus", "data_store": "bogus"}
+    body = json.dumps(file_info).encode("utf-8")
+    caplog.set_level(logging.INFO)
+
+    get_file_notif.notif_callback(
+        pika_channel,
+        method,
+        properties,
+        body,
+        dic=data_inv_client,
+    )
+
+    pika_channel.basic_nack.assert_called_with(
+        delivery_tag=method.delivery_tag, requeue=True
+    )
+    assert "Database connection failed" in caplog.text
+    assert "Nack sent after delay" in caplog.text
+
+
+@pytest.mark.parametrize("delivery_count", [0, 1])
+@pytest.mark.parametrize(
+    "config",
+    [
+        {
+            "Settings": {
+                "REQUEUE_DELAY_SECONDS": 3.0,
+                "REQUEUE_BACKOFF_FACTOR": 10.0,
+                "REQUEUE_DELAY_LIMIT_SECONDS": 60.0,
+            }
+        },
+        {
+            "Settings": {
+                "REQUEUE_DELAY_SECONDS": 10.0,
+                "REQUEUE_BACKOFF_FACTOR": 10.0,
+                "REQUEUE_DELAY_LIMIT_SECONDS": 60.0,
+            }
+        },
+    ],
+)
+@patch("new_file_notification.get_file_notif.time")
+def test_callback_upsert_failure_database_error_backoff(
+    time, config, delivery_count, caplog
+):
+    """Callback nacks with configurable backoff when the file database doesn't respond."""
     pika_channel = Mock()
     data_inv_client = Mock()
     conf = {"find_files.return_value": [], "upsert_file.side_effect": DIClientPgError}
@@ -92,13 +141,28 @@ def test_callback_upsert_failure_database_error(time, delivery_count, caplog):
     caplog.set_level(logging.INFO)
 
     get_file_notif.notif_callback(
-        pika_channel, method, properties, body, dic=data_inv_client
+        pika_channel,
+        method,
+        properties,
+        body,
+        dic=data_inv_client,
+        config=config,
     )
 
     # Check the delay.
     time.sleep.assert_called_once()
-    _, args, _ = time.sleep.mock_calls[0]
-    assert 2.0 * (1.5**delivery_count) <= args[0] <= 2.0 * (1.5**delivery_count) + 1.0
+    _, (seconds,), _ = time.sleep.mock_calls[0]
+    requeue_delay_seconds = config["Settings"]["REQUEUE_DELAY_SECONDS"]
+    requeue_backoff_factor = config["Settings"]["REQUEUE_BACKOFF_FACTOR"]
+    requeue_delay_limit_seconds = config["Settings"]["REQUEUE_DELAY_LIMIT_SECONDS"]
+    assert (
+        requeue_delay_seconds
+        <= seconds
+        <= min(
+            requeue_delay_limit_seconds,
+            requeue_delay_seconds * (requeue_backoff_factor**delivery_count) + 1.0,
+        )
+    )
 
     pika_channel.basic_nack.assert_called_with(
         delivery_tag=method.delivery_tag, requeue=True

@@ -23,7 +23,7 @@ DB.
 
 log = logging.getLogger(__name__)
 
-def notif_callback(ch, method, properties, body, dic):
+def notif_callback(ch, method, properties, body, dic, config=None):
     """The receive message callback function
 
     Conforming messages about new files result in upsert to the
@@ -48,6 +48,11 @@ def notif_callback(ch, method, properties, body, dic):
         The received message.
     dic: DIClient
         Data inventory client instance.
+    config: dict, optional
+        Requeue delay configuration parameters, like
+        {"Settings": {"REQUEUE_DELAY_SECONDS": 2.0,
+        "REQUEUE_BACKOFF_FACTOR": 1.5, "REQUEUE_DELAY_LIMIT_SECONDS":
+        60.0}
 
     """
     try:
@@ -123,7 +128,7 @@ def notif_callback(ch, method, properties, body, dic):
             )
             log.info(f"upsert result: {result}")
 
-            rows = dic.find_files(filenames = fname)
+            rows = dic.find_files(filenames=fname)
             for row in rows:
                 log.info('Got a DB row')
                 log.info(f"After: file_name: {row.get('file_name')}, location: {row.get('location')}, dir_path: {row.get('dir_path')}")
@@ -146,17 +151,25 @@ def notif_callback(ch, method, properties, body, dic):
         # in https://github.com/hynek/stamina).
         headers = properties.headers or {}
         delivery_count = headers.get("x-delivery-count", 0)
-        # TODO: make these configurable.
-        retry_delay_seconds = 2.0
-        retry_backoff_factor = 1.5
-        retry_delay_limit_seconds = 60.0
-        retry_jitter_max_seconds = 1.0
+
+        requeue_delay_seconds = (
+            config and config["Settings"]["REQUEUE_DELAY_SECONDS"]
+        ) or 2.0
+        requeue_backoff_factor = (
+            config and config["Settings"]["REQUEUE_BACKOFF_FACTOR"]
+        ) or 1.5
+        requeue_delay_limit_seconds = (
+            config and config["Settings"]["REQUEUE_DELAY_LIMIT_SECONDS"]
+        ) or 60.0
+        requeue_jitter_max_seconds = 1.0
+
         delay = min(
-            retry_delay_limit_seconds,
-            retry_delay_seconds * (retry_backoff_factor**delivery_count)
-            + random.uniform(0, retry_jitter_max_seconds),
+            requeue_delay_limit_seconds,
+            requeue_delay_seconds * (requeue_backoff_factor**delivery_count)
+            + random.uniform(0, requeue_jitter_max_seconds),
         )
         time.sleep(delay)
+
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
         log.info(
             "Nack sent after delay, with requeue. "
@@ -191,7 +204,7 @@ def notif_callback(ch, method, properties, body, dic):
     # data inventory client or callback itself.  Presumably these are
     # defects of this module or its dependencies and not infra failures,
     # requiring release and redeployment to fix.
-    except:
+    except Exception:
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
         log.exception(
             "File notification callback failed due to unexpected error. Message requeued."
@@ -225,7 +238,7 @@ def connect_to_queue(config):
     # Create the data inventory client object and allow it to be sent to the
     # rabbitmq callback
     dic = DIClient(user='geoips')
-    bound_callback = partial(notif_callback, dic=dic)
+    bound_callback = partial(notif_callback, dic=dic, config=config)
 
     # Set up "whichever's ready" dispatching
     # Register the callback function with rabbitmq
