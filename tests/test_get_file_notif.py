@@ -11,6 +11,7 @@ import pytest
 def notif_module(monkeypatch):
     """Import target module with a stubbed data_inv_api dependency."""
     data_inv_api = types.ModuleType("data_inv_api")
+    diapi = types.ModuleType("data_inv_api.pg_di_client")
     errors = types.ModuleType("data_inv_api.errors")
 
     class FakeDIClient:
@@ -28,11 +29,14 @@ def notif_module(monkeypatch):
     errors.DIClientPgError = FakeDIClientPgError
 
     monkeypatch.setitem(sys.modules, "data_inv_api", data_inv_api)
+    monkeypatch.setitem(sys.modules, "data_inv_api.pg_di_client", diapi)
     monkeypatch.setitem(sys.modules, "data_inv_api.errors", errors)
 
-    sys.modules.pop("new_file_notification.get_file_notif", None)
+    get_file_notif = sys.modules.pop("new_file_notification.get_file_notif", None)
     module = importlib.import_module("new_file_notification.get_file_notif")
-    return module
+    yield module
+
+    sys.modules["new_file_notification.get_file_notif"] = get_file_notif
 
 
 def test_connect_to_queue_declares_and_binds_callback(notif_module, monkeypatch):

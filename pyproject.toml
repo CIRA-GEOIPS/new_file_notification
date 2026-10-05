@@ -13,7 +13,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 
 [dependency-groups]
-test = ["pytest-cov"]
+test = ["pytest-cov", "pytest-random-order"]
 deps = [
   "data_inv_api @ git+ssh://git@bear.cira.colostate.edu/geoips/data_inv_api.git",
   "geoips",
