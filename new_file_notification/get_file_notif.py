@@ -7,10 +7,10 @@ import json
 import configparser
 from functools import partial
 
-# GeoIPS modules: the data inventory client
 import data_inv_api.pg_di_client as diapi
 from data_inv_api import DIClient
 from data_inv_api.errors import DIClientError, DIClientPgError
+import stamina
 
 DESCRIPTION = """
 Receives a new file notification from the GeoIPS RabbitMQ "New File
@@ -118,24 +118,19 @@ def connect_to_queue(config):
 
     return channel
 
+# Defaults:
+@stamina.retry(on=(OSError, pika.exceptions.AMQPError))
 def consume_notification(config):
     """Get the notifications and add the files to the DB"""
     channel = connect_to_queue(config)
 
-    # Start the "reconnection on error" loop
-    while True:
-        # Start the message checking loop
-        log.info(" [*] Waiting for messages. To exit press CTRL+C")
-        try:
-            channel.start_consuming()
-        except (
-            OSError,
-            pika.exceptions.AMQPConnectionError,
-            pika.exceptions.StreamLostError
-        ) as e:
-            log.exception(e)
-            log.info("Reconnecting to RabbitMQ")
-            channel = connect_to_queue(config)
+    try:
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        channel.stop_consuming()
+        channel.connection.close()
+    except pika.exceptions.ConnectionClosedByBroker:
+        pass
 
 
 def main():
