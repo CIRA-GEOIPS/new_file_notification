@@ -122,9 +122,15 @@ def connect_to_queue(config):
 # milliseconds, increasing by 2 with each attempt, with a maximum of
 # 5 seconds.  0-1 seconds of jitter is added until the maximum of
 # 5 seconds is reached.
-@stamina.retry(on=(OSError, pika.exceptions.AMQPError))
+@stamina.retry(
+    on=(
+        OSError,
+        pika.exceptions.AMQPConnectionError,
+        pika.exceptions.ConnectionClosedByBroker,
+    )
+)
 def consume_notification(config):
-    """Get the notifications and add the files to the DB"""
+    """Get the notifications and add the files to the DB."""
     channel = connect_to_queue(config)
 
     # Adapted from
@@ -132,10 +138,15 @@ def consume_notification(config):
     try:
         channel.start_consuming()
     except KeyboardInterrupt:
+        log.info("Shutting down.")
         channel.stop_consuming()
         channel.connection.close()
     except pika.exceptions.ConnectionClosedByBroker:
-        pass
+        log.error("Connection closed by broker. Attempting new connection.")
+        raise
+    # Pika docs recommend that we not recover from channel errors.
+    except pika.exceptions.AMQPChannelError:
+        log.exception("Caught a channel error, exiting.")
 
 
 def main():
