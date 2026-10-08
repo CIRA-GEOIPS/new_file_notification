@@ -1,10 +1,20 @@
+from functools import partial
 import importlib
+import logging
 import sys
 import types
-from functools import partial
 from unittest.mock import MagicMock
 
+import pika
 import pytest
+import stamina
+
+
+@pytest.fixture(autouse=True, scope="session")
+def limit_retries():
+    stamina.set_testing(True, attempts=10)
+    yield
+    stamina.set_testing(False)
 
 
 @pytest.fixture
@@ -75,27 +85,18 @@ def test_connect_to_queue_declares_and_binds_callback(notif_module, monkeypatch)
 
 
 def test_consume_notification_reconnects_on_amqp_connection_error(notif_module, monkeypatch):
+    """Retry a failed connection and succeed on the second attempt."""
     config = {"Settings": {"RMQ_HOST": "rabbitmq-host"}}
-    calls = {"count": 0}
-
-    first_channel = MagicMock()
-    second_channel = MagicMock()
-
-    first_channel.start_consuming.side_effect = notif_module.pika.exceptions.AMQPConnectionError(
-        "lost connection"
-    )
-    second_channel.start_consuming.side_effect = KeyboardInterrupt()
-
-    def fake_connect_to_queue(received_config):
-        calls["count"] += 1
-        assert received_config is config
-        return first_channel if calls["count"] == 1 else second_channel
+    fake_connect_to_queue = MagicMock()
+    fake_channel = MagicMock()
+    fake_connect_to_queue.side_effect = [
+        pika.exceptions.AMQPConnectionError("lost connection"),
+        fake_channel,
+    ]
 
     monkeypatch.setattr(notif_module, "connect_to_queue", fake_connect_to_queue)
 
-    with pytest.raises(KeyboardInterrupt):
-        notif_module.consume_notification(config)
+    notif_module.consume_notification(config)
 
-    assert calls["count"] == 2
-    assert first_channel.start_consuming.call_count == 1
-    assert second_channel.start_consuming.call_count == 1
+    assert fake_connect_to_queue.call_count == 2
+    fake_channel.start_consuming.assert_called_once()
