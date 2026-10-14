@@ -18,6 +18,7 @@ deps = [
   "data_inv_api @ git+ssh://git@bear.cira.colostate.edu/geoips/data_inv_api.git",
   "geoips",
   "pika",
+  "stamina",
 ]
 
 authors = [

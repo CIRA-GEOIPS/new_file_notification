@@ -10,10 +10,10 @@ import random
 import sys
 import time
 
-# GeoIPS modules: the data inventory client
 from data_inv_api import DIClient
 from data_inv_api.errors import DIClientError, DIClientPgError
 import data_inv_api.pg_di_client as diapi
+import stamina
 
 DESCRIPTION = """
 Receives a new file notification from the GeoIPS RabbitMQ "New File
@@ -248,24 +248,35 @@ def connect_to_queue(config):
 
     return channel
 
+# Defaults: times out after 45 seconds or 10 attempts.  Delay is 100
+# milliseconds, increasing by 2 with each attempt, with a maximum of
+# 5 seconds.  0-1 seconds of jitter is added until the maximum of
+# 5 seconds is reached.
+@stamina.retry(
+    on=(
+        OSError,
+        pika.exceptions.AMQPConnectionError,
+        pika.exceptions.ConnectionClosedByBroker,
+    )
+)
 def consume_notification(config):
-    """Get the notifications and add the files to the DB"""
+    """Get the notifications and add the files to the DB."""
     channel = connect_to_queue(config)
 
-    # Start the "reconnection on error" loop
-    while True:
-        # Start the message checking loop
-        log.info(" [*] Waiting for messages. To exit press CTRL+C")
-        try:
-            channel.start_consuming()
-        except (
-            OSError,
-            pika.exceptions.AMQPConnectionError,
-            pika.exceptions.StreamLostError
-        ) as e:
-            log.exception(e)
-            log.info("Reconnecting to RabbitMQ")
-            channel = connect_to_queue(config)
+    # Adapted from
+    # https://pika.readthedocs.io/en/stable/examples/blocking_consume_recover_multiple_hosts.html
+    try:
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        log.info("Shutting down.")
+        channel.stop_consuming()
+        channel.connection.close()
+    except pika.exceptions.ConnectionClosedByBroker:
+        log.error("Connection closed by broker. Attempting new connection.")
+        raise
+    # Pika docs recommend that we not recover from channel errors.
+    except pika.exceptions.AMQPChannelError:
+        log.exception("Caught a channel error, exiting.")
 
 
 def main():
@@ -303,11 +314,8 @@ def main():
 
 
 if __name__ == "__main__":
+    main()
     try:
-        main()
-    except KeyboardInterrupt:
-        log.info("Interrupted")
-        try:
-            sys.exit(0)
-        except SystemExit:
-            os._exit(0)
+        sys.exit(0)
+    except SystemExit:
+        os._exit(0)

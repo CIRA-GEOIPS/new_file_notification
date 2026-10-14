@@ -12,7 +12,7 @@ RUN apt-get update -y && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends python3-pip && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir geoips xxhash psycopg2 pika
+RUN pip install --no-cache-dir geoips xxhash psycopg2 pika stamina
 
 ARG INV_API_TOKEN
 
